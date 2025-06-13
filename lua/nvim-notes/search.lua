@@ -212,46 +212,49 @@ function M.interactive_search()
         note_map[display_line] = note
     end
 
-    -- FZF options
-    local fzf_opts = {
-        source = fzf_lines,
-        sink = function(selected)
-            if selected and note_map[selected] then
-                vim.cmd('edit ' .. note_map[selected].path)
-            end
-        end,
-        options = {
-            '--prompt=🔍 Search Notes: ',
-            '--height=60%',
-            '--layout=reverse',
-            '--border',
-            '--info=inline',
-            '--preview=bat --style=numbers --color=always --line-range=:50 {3}',
-            '--preview-window=right:50%:wrap',
-            '--bind=ctrl-/:toggle-preview',
-            '--header=Ctrl-/ to toggle preview, Enter to open note',
-        }
-    }
+    print('Found ' .. #notes .. ' notes to search through')
 
-    -- Use fzf#run if available, otherwise use fzf#vim#files as fallback
+    -- Use fzf#run if available
     if vim.fn.exists('*fzf#run') == 1 then
-        vim.fn['fzf#run'](fzf_opts)
-    else
-        -- Fallback to simple FZF call
-        local cmd = 'echo "' ..
-            table.concat(fzf_lines, '\n') .. '" | fzf --prompt="🔍 Search Notes: " --height=60% --layout=reverse --border'
+        print('Using fzf#run')
 
-        vim.fn.jobstart(cmd, {
-            on_stdout = function(_, data)
-                if data and data[1] and data[1] ~= '' then
-                    local selected = data[1]
-                    if note_map[selected] then
-                        vim.cmd('edit ' .. note_map[selected].path)
-                    end
+        local fzf_opts = {
+            source = fzf_lines,
+            sink = function(selected)
+                if selected and note_map[selected] then
+                    vim.cmd('edit ' .. note_map[selected].path)
                 end
             end,
-            stdout_buffered = true,
-        })
+            options = {
+                '--prompt=🔍 Search Notes: ',
+                '--height=60%',
+                '--layout=reverse',
+                '--border',
+                '--info=inline',
+                '--header=Enter to open note, Esc to cancel',
+            }
+        }
+
+        vim.fn['fzf#run'](fzf_opts)
+    else
+        print('fzf#run not available, using vim.ui.select fallback')
+
+        -- Fallback to vim.ui.select
+        local options = {}
+        for _, line in ipairs(fzf_lines) do
+            table.insert(options, line)
+        end
+
+        vim.ui.select(options, {
+            prompt = '🔍 Search Notes: ',
+            format_item = function(item)
+                return item
+            end,
+        }, function(choice)
+            if choice and note_map[choice] then
+                vim.cmd('edit ' .. note_map[choice].path)
+            end
+        end)
     end
 end
 
