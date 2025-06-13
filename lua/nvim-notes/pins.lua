@@ -12,17 +12,48 @@ local function init_database()
         local data_dir = vim.fn.stdpath('data') .. '/nvim-notes'
         db_path = data_dir .. '/notes.db'
 
+        print('DEBUG: Data directory: ' .. data_dir)
+        print('DEBUG: Database path: ' .. db_path)
+
         -- Create directory if it doesn't exist
         if not vim.fn.isdirectory(data_dir) then
+            print('DEBUG: Directory does not exist, creating: ' .. data_dir)
             local success = vim.fn.mkdir(data_dir, 'p')
+            print('DEBUG: mkdir result: ' .. tostring(success))
             if success == 0 then
-                print('Warning: Failed to create nvim-notes data directory: ' .. data_dir)
+                print('ERROR: Failed to create nvim-notes data directory: ' .. data_dir)
                 return false
             end
+            print('DEBUG: Directory created successfully')
+        else
+            print('DEBUG: Directory already exists')
+        end
+
+        -- Verify directory exists and is writable
+        if not vim.fn.isdirectory(data_dir) then
+            print('ERROR: Directory still does not exist after creation attempt')
+            return false
+        end
+
+        -- Test if we can write to the directory
+        local test_file = data_dir .. '/test_write.tmp'
+        local test_handle = io.open(test_file, 'w')
+        if test_handle then
+            test_handle:write('test')
+            test_handle:close()
+            os.remove(test_file) -- Clean up test file
+            print('DEBUG: Directory is writable')
+        else
+            print('ERROR: Cannot write to directory: ' .. data_dir)
+            return false
         end
 
         -- Create database and tables if they don't exist
-        M.create_tables()
+        print('DEBUG: Creating database tables')
+        if not M.create_tables() then
+            print('ERROR: Failed to create database tables')
+            return false
+        end
     end
     return true
 end
@@ -135,7 +166,10 @@ function M.create_tables()
             pinned_at INTEGER
         )
     ]]
-    return execute_sql(sql)
+    print('DEBUG: Executing CREATE TABLE')
+    local result = execute_sql(sql)
+    print('DEBUG: CREATE TABLE result: ' .. tostring(result))
+    return result
 end
 
 -- Load pinned notes from database
