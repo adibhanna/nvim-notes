@@ -12,7 +12,7 @@ A comprehensive note-taking plugin for Neovim with full markdown support, beauti
 - **🎨 Syntax Highlighting**: Enhanced markdown syntax with note-specific highlighting
 - **🗂️ Vault Management**: Organized note storage with customizable vault location
 - **✨ Beautiful UI**: Elegant menus and inputs powered by nui.nvim
-- **📊 Dashboard**: Overview of your notes, tags, and recent activity
+- **📊 Dashboard**: Beautiful popup overview of your notes, tags, and recent activity
 
 ## 📦 Installation
 
@@ -119,33 +119,44 @@ Available template variables:
 
 ### Commands
 
-| Command            | Description                                  |
-| ------------------ | -------------------------------------------- |
-| `:NotesNew [name]` | Create a new note (defaults to current date) |
-
-| `:NotesSearch [query]`    | Search notes by content                      |
+| Command                   | Description                                  |
+| ------------------------- | -------------------------------------------- |
+| `:NotesNew [name]`        | Create a new note (defaults to current date) |
+| `:NotesSearch [query]`    | Search notes by content (pinned shown first) |
 | `:NotesSearchTags [tags]` | Search notes by tags                         |
-| `:NotesPin`               | Toggle pin status of current note            |
-| `:NotesPinned`            | Show all pinned notes                        |
+| `:NotesPinToggle`         | Toggle pin status of current note            |
+| `:NotesDelete`            | Delete current note (with confirmation)      |
 | `:NotesPreview`           | Preview current note in markdown             |
-| `:NotesIndex`             | Show notes dashboard                         |
+| `:NotesIndex`             | Show notes dashboard popup                   |
 | `:NotesSetVault [path]`   | Set the notes vault directory                |
 
 ### Keybindings
 
 The plugin automatically sets up keybindings if `which-key.nvim` is installed:
 
-| Keymap       | Action                  |
-| ------------ | ----------------------- |
-| `<leader>nn` | Create new note         |
-| `<leader>ns` | Search notes content    |
-| `<leader>nt` | Search by tags          |
-| `<leader>np` | Toggle pin current note |
-| `<leader>nP` | Search pinned notes     |
-| `<leader>nv` | Preview current note    |
-| `<leader>ni` | Show notes dashboard    |
+| Keymap           | Action                            |
+| ---------------- | --------------------------------- |
+| `<leader><tab>n` | Create new note                   |
+| `<leader><tab>s` | Search notes (pinned shown first) |
+| `<leader><tab>t` | Search by tags                    |
+| `<leader><tab>p` | Toggle pin current note           |
+| `<leader><tab>d` | Delete current note               |
+| `<leader><tab>v` | Preview current note              |
+| `<leader><tab>i` | Show notes dashboard popup        |
 
 If `which-key.nvim` is not installed, no default keybindings are set. You can use the commands directly or set up your own keybindings.
+
+### 📚 Dashboard Features
+
+The Notes Dashboard (`<leader><tab>i` or `:NotesIndex`) provides a beautiful popup overview:
+
+- **📊 Quick Stats**: Total notes, pinned count, tags overview
+- **📌 Pinned Notes**: Your most important notes at a glance
+- **🕐 Recent Activity**: Latest modified notes
+- **🏷️ Popular Tags**: Most used tags with counts
+- **⚡ Quick Actions**: Single-key shortcuts to common actions
+- **📱 Interactive**: Press `n`, `s`, `t`, `p`, `v` for instant actions
+- **❓ Help**: Press `?` for keyboard shortcuts
 
 ### Custom Keybindings
 
@@ -176,26 +187,77 @@ vim.keymap.set('n', '<leader>ns', notes.search_notes, { desc = 'Search notes' })
 
 ### 2. Organizing with Tags
 
-Add tags to your notes in several ways:
+nvim-notes supports multiple tagging formats for flexible organization:
 
+#### Tag Formats
+
+**1. Hashtag Style (anywhere in content):**
 ```markdown
-# My Note
+# Meeting Notes
 
-Tags: project personal important
-
-Some content with #hashtags and more #tags.
+Today we discussed #project-alpha and #budget-planning.
+The #urgent items need attention by #deadline-friday.
 ```
+
+**2. Tags Line (YAML-style):**
+```markdown
+# Project Update
+
+Tags: work project urgent meeting
+Tags: project-alpha, budget, Q1-planning
+
+Content goes here...
+```
+
+**3. Mixed Usage:**
+```markdown
+# Daily Standup
+
+Tags: work meeting daily
+
+- Discussed #project-alpha progress
+- #blocker: waiting for API documentation  
+- Next: focus on #frontend-tasks
+```
+
+#### Searching by Tags
+
+```bash
+# Search for specific tags
+:NotesSearchTags project
+:NotesSearchTags "work urgent"
+
+# Use the keybinding
+<leader><tab>t
+
+# From dashboard - press 't'
+<leader><tab>i
+```
+
+#### Tag Best Practices
+
+- **Use consistent naming**: `project-alpha` vs `projectalpha` vs `project_alpha`
+- **Create tag hierarchies**: `work/meetings`, `personal/ideas`, `learning/vim`
+- **Keep tags short**: `urgent` vs `urgent-high-priority`
+- **Use descriptive tags**: `budget-2024` vs `budget`
+
+#### Tag Management
+
+Tags are automatically extracted and indexed. View popular tags in the dashboard (`<leader><tab>i`) to see:
+- Most used tags with counts
+- Tag-based note organization
+- Quick tag-based search access
 
 ### 3. Pinning Important Notes
 
-Pin frequently accessed notes:
+Pin frequently accessed notes for quick access:
 
 ```lua
 -- Pin current note
-:NotesPin
+:NotesPinToggle
 
--- View all pinned notes
-:NotesPinned
+-- Pinned notes appear first in search results
+:NotesSearch
 ```
 
 ### 4. Searching and Discovery
@@ -210,6 +272,32 @@ Pin frequently accessed notes:
 -- Browse all notes  
 :NotesSearch
 ```
+
+### 5. Note Management
+
+```lua
+-- Delete current note (with confirmation)
+:NotesDelete
+<leader><tab>d
+
+-- Pin/unpin current note
+:NotesPinToggle
+<leader><tab>p
+```
+
+### 6. Dashboard Overview
+
+Get a quick overview of your notes:
+
+```lua
+-- Open beautiful dashboard popup
+:NotesIndex
+
+-- Or use the keybing
+<leader><tab>i
+```
+
+The dashboard shows your vault stats, pinned notes, recent activity, and popular tags with interactive shortcuts for quick actions.
 
 ## 🎨 Syntax Highlighting
 

@@ -198,11 +198,44 @@ function M.interactive_search()
         return
     end
 
-    -- Format notes for FZF display
+    -- Get pinned notes and separate them
+    local pins = require('nvim-notes.pins')
+    local pinned_notes = pins.get_pinned_notes()
+    local pinned_paths = {}
+
+    for _, pinned in ipairs(pinned_notes) do
+        pinned_paths[pinned.path] = true
+    end
+
+    -- Separate pinned and unpinned notes
+    local pinned_list = {}
+    local unpinned_list = {}
+
+    for _, note in ipairs(notes) do
+        if pinned_paths[note.path] then
+            table.insert(pinned_list, note)
+        else
+            table.insert(unpinned_list, note)
+        end
+    end
+
+    -- Format notes for FZF display (pinned first)
     local fzf_lines = {}
     local note_map = {}
 
-    for i, note in ipairs(notes) do
+    -- Add pinned notes first with pin indicator
+    for _, note in ipairs(pinned_list) do
+        local display_line = string.format('📌 %s (%s) - %s',
+            note.title,
+            note.modified,
+            note.relative_path
+        )
+        table.insert(fzf_lines, display_line)
+        note_map[display_line] = note
+    end
+
+    -- Add unpinned notes
+    for _, note in ipairs(unpinned_list) do
         local display_line = string.format('%s (%s) - %s',
             note.title,
             note.modified,
@@ -212,7 +245,13 @@ function M.interactive_search()
         note_map[display_line] = note
     end
 
-    print('Found ' .. #notes .. ' notes to search through')
+    local header_text = 'Enter to open note, Esc to cancel'
+    if #pinned_list > 0 then
+        header_text = string.format('📌 %d pinned notes shown first • %s', #pinned_list, header_text)
+    end
+
+    print('Found ' ..
+        #notes .. ' notes to search through' .. (#pinned_list > 0 and ' (' .. #pinned_list .. ' pinned)' or ''))
 
     -- Use fzf#run if available
     if vim.fn.exists('*fzf#run') == 1 then
@@ -231,7 +270,7 @@ function M.interactive_search()
                 '--layout=reverse',
                 '--border',
                 '--info=inline',
-                '--header=Enter to open note, Esc to cancel',
+                '--header=' .. header_text,
             }
         }
 
@@ -263,20 +302,17 @@ function M.live_note_finder()
     return M.interactive_search()
 end
 
--- Search by tags using FZF
+-- Search by tags using vim.ui.select
 function M.search_by_tags()
-    -- Check if fzf is available
-    if vim.fn.executable('fzf') == 0 then
-        print('FZF not found. Please install fzf: https://github.com/junegunn/fzf')
-        return
-    end
-
     local all_tags = {}
     local notes = utils.get_all_notes()
     local tag_notes_map = {}
 
+    print('Debug: Found ' .. #notes .. ' notes to scan for tags')
+
     for _, note in ipairs(notes) do
         local tags = utils.extract_tags(note.path)
+        print('Debug: Note "' .. note.title .. '" has tags: ' .. table.concat(tags, ', '))
         for _, tag in ipairs(tags) do
             if not vim.tbl_contains(all_tags, tag) then
                 table.insert(all_tags, tag)
@@ -286,56 +322,45 @@ function M.search_by_tags()
         end
     end
 
+    print('Debug: Found ' .. #all_tags .. ' unique tags: ' .. table.concat(all_tags, ', '))
+
     if #all_tags == 0 then
         print('No tags found in notes')
         return
     end
 
-    -- Format tags for FZF display
-    local fzf_lines = {}
+    -- Format tags for display
+    local tag_options = {}
+    local tag_map = {}
     for _, tag in ipairs(all_tags) do
         local count = #tag_notes_map[tag]
         local display_line = string.format('#%s (%d notes)', tag, count)
-        table.insert(fzf_lines, display_line)
+        table.insert(tag_options, display_line)
+        tag_map[display_line] = { tag = tag, notes = tag_notes_map[tag] }
     end
 
-    -- FZF options for tag selection
-    local fzf_opts = {
-        source = fzf_lines,
-        sink = function(selected)
-            if selected then
-                local tag = selected:match('^#([^%s]+)')
-                if tag and tag_notes_map[tag] then
-                    M.show_notes_for_tag(tag, tag_notes_map[tag])
-                end
-            end
+    -- Use vim.ui.select for tag selection
+    vim.ui.select(tag_options, {
+        prompt = '🏷️ Select Tag: ',
+        format_item = function(item)
+            return item
         end,
-        options = {
-            '--prompt=🏷️ Select Tag: ',
-            '--height=40%',
-            '--layout=reverse',
-            '--border',
-            '--info=inline',
-            '--header=Select a tag to see all notes with that tag',
-        }
-    }
-
-    if vim.fn.exists('*fzf#run') == 1 then
-        vim.fn['fzf#run'](fzf_opts)
-    else
-        print('FZF vim plugin not available. Please install fzf.vim')
-    end
+    }, function(choice)
+        if choice and tag_map[choice] then
+            M.show_notes_for_tag(tag_map[choice].tag, tag_map[choice].notes)
+        end
+    end)
 end
 
--- Show notes for a specific tag using FZF
+-- Show notes for a specific tag using vim.ui.select
 function M.show_notes_for_tag(tag, tag_notes)
     if not tag_notes or #tag_notes == 0 then
         print('No notes found for tag: ' .. tag)
         return
     end
 
-    -- Format notes for FZF display
-    local fzf_lines = {}
+    -- Format notes for display
+    local note_options = {}
     local note_map = {}
 
     for _, note in ipairs(tag_notes) do
@@ -344,64 +369,13 @@ function M.show_notes_for_tag(tag, tag_notes)
             note.modified,
             note.relative_path
         )
-        table.insert(fzf_lines, display_line)
+        table.insert(note_options, display_line)
         note_map[display_line] = note
     end
 
-    -- FZF options
-    local fzf_opts = {
-        source = fzf_lines,
-        sink = function(selected)
-            if selected and note_map[selected] then
-                vim.cmd('edit ' .. note_map[selected].path)
-            end
-        end,
-        options = {
-            '--prompt=📝 Notes with #' .. tag .. ': ',
-            '--height=60%',
-            '--layout=reverse',
-            '--border',
-            '--info=inline',
-            '--preview=bat --style=numbers --color=always --line-range=:50 {}',
-            '--preview-window=right:50%:wrap',
-            '--bind=ctrl-/:toggle-preview',
-            '--header=Notes tagged with #' .. tag .. ' (' .. #tag_notes .. ' total)',
-        }
-    }
-
-    if vim.fn.exists('*fzf#run') == 1 then
-        vim.fn['fzf#run'](fzf_opts)
-    else
-        print('FZF vim plugin not available')
-    end
-end
-
--- Search pinned notes
-function M.search_pinned_notes()
-    local pins = require('nvim-notes.pins')
-    local pinned_notes = pins.get_pinned_notes()
-
-    if #pinned_notes == 0 then
-        print('No pinned notes found')
-        return
-    end
-
-    -- Format notes for display
-    local options = {}
-    local note_map = {}
-
-    for _, note in ipairs(pinned_notes) do
-        local display_line = string.format('📌 %s (%s) - %s',
-            note.title,
-            note.modified,
-            note.relative_path
-        )
-        table.insert(options, display_line)
-        note_map[display_line] = note
-    end
-
-    vim.ui.select(options, {
-        prompt = '📌 Pinned Notes (' .. #pinned_notes .. ' total): ',
+    -- Use vim.ui.select for note selection
+    vim.ui.select(note_options, {
+        prompt = string.format('📝 Notes with #%s (%d total): ', tag, #tag_notes),
         format_item = function(item)
             return item
         end,

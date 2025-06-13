@@ -27,9 +27,9 @@ vim.api.nvim_create_user_command('NotesPinToggle', function()
     notes.toggle_pin()
 end, { desc = 'Toggle pin status of current note' })
 
-vim.api.nvim_create_user_command('NotesPinSearch', function()
-    notes.search_pinned_notes()
-end, { desc = 'Search pinned notes' })
+vim.api.nvim_create_user_command('NotesDelete', function()
+    notes.delete_note()
+end, { desc = 'Delete current note' })
 
 vim.api.nvim_create_user_command('NotesPreview', function()
     notes.preview_markdown()
@@ -46,29 +46,26 @@ local function set_keybindings()
     if has_whichkey then
         -- Set the actual keybindings
         local opts = { noremap = true, silent = true }
-        vim.keymap.set('n', '<leader>fnn', notes.new_note, vim.tbl_extend('force', opts, { desc = 'Create new note' }))
-        vim.keymap.set('n', '<leader>fns', notes.search_notes,
+        vim.keymap.set('n', '<leader><tab>n', notes.new_note, vim.tbl_extend('force', opts, { desc = 'Create new note' }))
+        vim.keymap.set('n', '<leader><tab>s', notes.search_notes,
             vim.tbl_extend('force', opts, { desc = 'Search notes content' }))
-        vim.keymap.set('n', '<leader>fnt', notes.search_by_tags,
+        vim.keymap.set('n', '<leader><tab>t', notes.search_by_tags,
             vim.tbl_extend('force', opts, { desc = 'Search by tags' }))
-        vim.keymap.set('n', '<leader>fnp', notes.toggle_pin,
+        vim.keymap.set('n', '<leader><tab>p', notes.toggle_pin,
             vim.tbl_extend('force', opts, { desc = 'Toggle pin current note' }))
-        vim.keymap.set('n', '<leader>fnP', notes.search_pinned_notes,
-            vim.tbl_extend('force', opts, { desc = 'Search pinned notes' }))
-        vim.keymap.set('n', '<leader>fnv', notes.preview_markdown,
+        vim.keymap.set('n', '<leader><tab>v', notes.preview_markdown,
             vim.tbl_extend('force', opts, { desc = 'Preview current note' }))
-        vim.keymap.set('n', '<leader>fni', notes.show_index,
+        vim.keymap.set('n', '<leader><tab>i', notes.show_index,
             vim.tbl_extend('force', opts, { desc = 'Show notes dashboard' }))
 
         -- Register with which-key
         wk.register({
-            fn = {
+            ["<tab>"] = {
                 name = "Notes",
                 n = { notes.new_note, "Create new note" },
-                s = { notes.search_notes, "Search notes content" },
+                s = { notes.search_notes, "Search notes" },
                 t = { notes.search_by_tags, "Search by tags" },
                 p = { notes.toggle_pin, "Toggle pin current note" },
-                P = { notes.search_pinned_notes, "Search pinned notes" },
                 v = { notes.preview_markdown, "Preview current note" },
                 i = { notes.show_index, "Show notes dashboard" },
             }
