@@ -7,7 +7,7 @@ function M.get_all_notes()
     local notes = {}
 
     -- Use vim's globpath to find all markdown files
-    local files = vim.split(vim.fn.globpath(vault_path, '**/*.md', false, true), '\n')
+    local files = vim.fn.globpath(vault_path, '**/*.md', false, true)
 
     for _, file in ipairs(files) do
         if file ~= '' then
