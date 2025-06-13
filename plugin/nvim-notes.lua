@@ -39,26 +39,32 @@ vim.api.nvim_create_user_command('NotesIndex', function()
     notes.show_index()
 end, { desc = 'Show notes index/dashboard' })
 
--- Default keybindings (can be overridden in user config)
+-- Set up keybindings with which-key if available
 local function set_keybindings()
-    local opts = { noremap = true, silent = true }
-    vim.keymap.set('n', '<leader>nn', notes.new_note, vim.tbl_extend('force', opts, { desc = 'Create new note' }))
-    vim.keymap.set('n', '<leader>ns', notes.search_notes,
-        vim.tbl_extend('force', opts, { desc = 'Search notes content' }))
-    vim.keymap.set('n', '<leader>nt', notes.search_by_tags, vim.tbl_extend('force', opts, { desc = 'Search by tags' }))
-    vim.keymap.set('n', '<leader>np', notes.toggle_pin,
-        vim.tbl_extend('force', opts, { desc = 'Toggle pin current note' }))
-    vim.keymap.set('n', '<leader>nP', notes.search_pinned_notes,
-        vim.tbl_extend('force', opts, { desc = 'Search pinned notes' }))
-    vim.keymap.set('n', '<leader>nv', notes.preview_markdown,
-        vim.tbl_extend('force', opts, { desc = 'Preview current note' }))
-    vim.keymap.set('n', '<leader>ni', notes.show_index, vim.tbl_extend('force', opts, { desc = 'Show notes dashboard' }))
+    local has_whichkey, wk = pcall(require, 'which-key')
+
+    if has_whichkey then
+        wk.register({
+            n = {
+                name = "Notes",
+                n = { notes.new_note, "Create new note" },
+                s = { notes.search_notes, "Search notes content" },
+                t = { notes.search_by_tags, "Search by tags" },
+                p = { notes.toggle_pin, "Toggle pin current note" },
+                P = { notes.search_pinned_notes, "Search pinned notes" },
+                v = { notes.preview_markdown, "Preview current note" },
+                i = { notes.show_index, "Show notes dashboard" },
+            }
+        }, { prefix = "<leader>" })
+    end
+    -- If which-key is not available, no default keymaps are set
+    -- Users can set their own keymaps or use commands directly
 end
 
 -- Setup function to be called by user
 _G.setup_nvim_notes = function(config)
     notes.setup(config or {})
-    if not config or config.disable_default_keybindings ~= true then
+    if not config or config.disable_keybindings ~= true then
         set_keybindings()
     end
 end

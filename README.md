@@ -119,10 +119,10 @@ Available template variables:
 
 ### Commands
 
-| Command                   | Description                                  |
-| ------------------------- | -------------------------------------------- |
-| `:NotesNew [name]`        | Create a new note (defaults to current date) |
-| `:NotesOpen`              | Open/search for existing notes               |
+| Command            | Description                                  |
+| ------------------ | -------------------------------------------- |
+| `:NotesNew [name]` | Create a new note (defaults to current date) |
+
 | `:NotesSearch [query]`    | Search notes by content                      |
 | `:NotesSearchTags [tags]` | Search notes by tags                         |
 | `:NotesPin`               | Toggle pin status of current note            |
@@ -131,32 +131,34 @@ Available template variables:
 | `:NotesIndex`             | Show notes dashboard                         |
 | `:NotesSetVault [path]`   | Set the notes vault directory                |
 
-### Default Keybindings
+### Keybindings
+
+The plugin automatically sets up keybindings if `which-key.nvim` is installed:
 
 | Keymap       | Action                  |
 | ------------ | ----------------------- |
 | `<leader>nn` | Create new note         |
-| `<leader>no` | Open/search notes       |
 | `<leader>ns` | Search notes content    |
 | `<leader>nt` | Search by tags          |
 | `<leader>np` | Toggle pin current note |
-| `<leader>nP` | Show pinned notes       |
+| `<leader>nP` | Search pinned notes     |
 | `<leader>nv` | Preview current note    |
-| `<leader>ni` | Show notes index        |
+| `<leader>ni` | Show notes dashboard    |
+
+If `which-key.nvim` is not installed, no default keybindings are set. You can use the commands directly or set up your own keybindings.
 
 ### Custom Keybindings
 
 ```lua
--- Disable default keybindings and set your own
+-- Disable automatic keybindings and set your own
 require('nvim-notes').setup({
-  disable_default_keybindings = true,
+  disable_keybindings = true,
 })
 
 -- Set custom keybindings
 local notes = require('nvim-notes')
-vim.keymap.set('n', '<leader>nn', notes.new_note)
-vim.keymap.set('n', '<leader>nf', notes.open_note)
-vim.keymap.set('n', '<leader>ns', notes.search_notes)
+vim.keymap.set('n', '<leader>nn', notes.new_note, { desc = 'Create new note' })
+vim.keymap.set('n', '<leader>ns', notes.search_notes, { desc = 'Search notes' })
 -- ... etc
 ```
 
@@ -205,8 +207,8 @@ Pin frequently accessed notes:
 -- Search by tags
 :NotesSearchTags "project work"
 
--- Browse all notes
-:NotesOpen
+-- Browse all notes  
+:NotesSearch
 ```
 
 ## 🎨 Syntax Highlighting
