@@ -127,44 +127,20 @@ function M.search_notes(query)
     search.search_all(query)
 end
 
--- Search notes by tags
+-- Search notes by tags using FZF
 function M.search_by_tags(tag_query)
     if not tag_query or tag_query == '' then
-        local Input = require('nui.input')
-        local event = require('nui.utils.autocmd').event
-
-        local input = Input({
-            position = '50%',
-            size = { width = 60 },
-            border = {
-                style = 'rounded',
-                text = {
-                    top = '[🏷️  Search by Tags]',
-                    top_align = 'center',
-                },
-            },
-            win_options = {
-                winhighlight = 'Normal:Normal,FloatBorder:Normal',
-            },
-        }, {
-            prompt = '> ',
-            default_value = '',
-            on_close = function() end,
-            on_submit = function(value)
-                if value and value ~= '' then
-                    tags.search_by_tags(value)
-                end
-            end,
-        })
-
-        input:mount()
-        input:on(event.BufLeave, function()
-            input:unmount()
-        end)
+        -- Use FZF for tag selection
+        search.search_by_tags()
         return
     end
 
     tags.search_by_tags(tag_query)
+end
+
+-- Search pinned notes using FZF
+function M.search_pinned_notes()
+    search.search_pinned_notes()
 end
 
 -- Toggle pin status of current note
@@ -191,9 +167,9 @@ function M.toggle_pin()
     end
 end
 
--- Show pinned notes
+-- Show pinned notes using FZF
 function M.show_pinned()
-    pins.show_pinned_notes()
+    search.search_pinned_notes()
 end
 
 -- Preview current note in markdown
