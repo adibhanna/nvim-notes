@@ -5,7 +5,7 @@ A comprehensive note-taking plugin for Neovim with full markdown support, beauti
 ## ✨ Features
 
 - **📝 Quick Note Creation**: Create notes with automatic date-based naming
-- **🔍 Powerful Search**: Search notes by content, filename, or tags
+- **🔍 Powerful Search**: Search notes by content, filename, or tags using vim.ui.select
 - **🏷️ Tag Management**: Create, manage, and search by tags
 - **📌 Pin Notes**: Pin important notes for quick access
 - **👀 Markdown Preview**: Multiple preview options including terminal, browser, and floating windows
@@ -22,8 +22,7 @@ A comprehensive note-taking plugin for Neovim with full markdown support, beauti
 {
   'adibhanna/nvim-notes',
   dependencies = {
-    'junegunn/fzf', -- Required for fuzzy finding
-    'junegunn/fzf.vim', -- Required for fzf integration
+    'MunifTanjim/nui.nvim', -- Required for beautiful UI components
   },
   config = function()
     require('nvim-notes').setup({
@@ -39,8 +38,7 @@ A comprehensive note-taking plugin for Neovim with full markdown support, beauti
 use {
   'adibhanna/nvim-notes',
   requires = {
-    'junegunn/fzf', -- Required for fuzzy finding
-    'junegunn/fzf.vim', -- Required for fzf integration
+    'MunifTanjim/nui.nvim', -- Required for beautiful UI components
   },
   config = function()
     require('nvim-notes').setup()
@@ -50,22 +48,18 @@ use {
 
 ## 📋 Prerequisites
 
-Before installing, make sure you have FZF installed on your system:
+The plugin works out of the box with Neovim's built-in `vim.ui.select`. For enhanced search experience, you can optionally install:
 
 ```bash
-# macOS
-brew install fzf
+# Optional: For better markdown preview
+brew install glow
 
-# Ubuntu/Debian
-sudo apt install fzf
-
-# Arch Linux
-sudo pacman -S fzf
-
-# Or install via git
-git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
-~/.fzf/install
+# Optional: Alternative preview tools
+brew install bat
+cargo install mdcat
 ```
+
+No external fuzzy finder dependencies required!
 
 ## ⚙️ Configuration
 
@@ -82,8 +76,9 @@ require('nvim-notes').setup({
   enable_concealing = true,                  -- Enable markdown concealing
   conceal_level = 2,                         -- Conceal level for markdown
   disable_default_keybindings = false,       -- Disable default key mappings
-  telescope_theme = 'dropdown',              -- Telescope theme
   max_recent_notes = 10,                     -- Number of recent notes to show
+  spell_check = false,                       -- Enable spell checking for notes
+  spell_lang = 'en_us',                      -- Spell check language
 })
 ```
 
@@ -119,16 +114,17 @@ Available template variables:
 
 ### Commands
 
-| Command                   | Description                                  |
-| ------------------------- | -------------------------------------------- |
-| `:NotesNew [name]`        | Create a new note (defaults to current date) |
-| `:NotesSearch [query]`    | Search notes by content (pinned shown first) |
-| `:NotesSearchTags [tags]` | Search notes by tags                         |
-| `:NotesPinToggle`         | Toggle pin status of current note            |
-| `:NotesDelete`            | Delete current note (with confirmation)      |
-| `:NotesPreview`           | Preview current note in markdown             |
-| `:NotesIndex`             | Show notes dashboard popup                   |
-| `:NotesSetVault [path]`   | Set the notes vault directory                |
+| Command                   | Description                                      |
+| ------------------------- | ------------------------------------------------ |
+| `:NotesNew [name]`        | Create a new note (defaults to current date)     |
+| `:NotesSearch [query]`    | Search notes by content (pinned shown first)     |
+| `:NotesSearchTags [tags]` | Search notes by tags                             |
+| `:NotesPinToggle`         | Toggle pin status of current note                |
+| `:NotesDelete`            | Delete current note (with confirmation)          |
+| `:NotesPreview`           | Preview current note in markdown                 |
+| `:NotesIndex`             | Show notes dashboard popup                       |
+| `:NotesSetVault [path]`   | Set the notes vault directory                    |
+| `:NotesSync`              | Sync notes with GitHub (creates repo first time) |
 
 ### Keybindings
 
@@ -143,6 +139,7 @@ The plugin automatically sets up keybindings if `which-key.nvim` is installed:
 | `<leader><tab>d` | Delete current note               |
 | `<leader><tab>v` | Preview current note              |
 | `<leader><tab>i` | Show notes dashboard popup        |
+| `<leader><tab>S` | Sync notes with GitHub            |
 
 If `which-key.nvim` is not installed, no default keybindings are set. You can use the commands directly or set up your own keybindings.
 
@@ -298,6 +295,74 @@ Get a quick overview of your notes:
 ```
 
 The dashboard shows your vault stats, pinned notes, recent activity, and popular tags with interactive shortcuts for quick actions.
+
+## 🔄 GitHub Sync & Backup
+
+Keep your notes safe and synced across devices with one simple command.
+
+### Prerequisites
+
+Install and authenticate with GitHub CLI:
+
+```bash
+# Install GitHub CLI
+brew install gh
+# or on Linux
+sudo apt install gh
+
+# Authenticate with GitHub
+gh auth login
+```
+
+### Usage
+
+**One command does everything:**
+
+```bash
+:NotesSync
+# or
+<leader><tab>S
+```
+
+**First time:** Creates a private GitHub repository and pushes all your notes  
+**Every other time:** Syncs changes bidirectionally (pull then push)
+
+### Features
+
+- **🚀 Zero configuration**: Just run `:NotesSync`
+- **🔒 Private repositories**: Your notes stay private
+- **🔄 Bidirectional sync**: Pulls remote changes, then pushes local changes
+- **📝 Smart commits**: Automatic timestamped commits
+- **📱 Multi-device**: Use the same command on all devices
+- **💾 Backup**: Never lose your notes
+
+### Multi-Device Workflow
+
+**On your first device:**
+```bash
+:NotesSync  # Creates repo and pushes notes
+```
+
+**On additional devices:**
+```bash
+# Clone the repository first (one time)
+gh repo clone your-username/your-notes-repo ~/notes
+:NotesSetVault ~/notes
+
+# Then just sync normally
+:NotesSync  # Pulls latest, pushes any changes
+```
+
+**Daily usage on any device:**
+```bash
+:NotesSync  # That's it!
+```
+
+The command automatically:
+1. Pulls any remote changes first
+2. Commits your local changes
+3. Pushes everything to GitHub
+4. Handles conflicts gracefully
 
 ## 🎨 Syntax Highlighting
 

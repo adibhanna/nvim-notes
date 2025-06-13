@@ -9,7 +9,18 @@ local M = {}
 
 -- Setup function
 function M.setup(user_config)
-    config.setup(user_config)
+    -- Prevent German spell check warnings globally and aggressively
+    vim.opt.spelllang = 'en_us'
+    vim.opt.spell = false
+
+    -- Also set it as a fallback in case other plugins override
+    vim.cmd('set spelllang=en_us')
+    vim.cmd('set nospell')
+
+    -- Disable spell checking completely to prevent any language loading
+    vim.g.loaded_spellfile_plugin = 1
+
+    config.setup(user_config or {})
 
     -- Ensure vault directory exists
     local vault_path = config.get_vault_path()
@@ -32,15 +43,67 @@ function M.setup(user_config)
         end
     })
 
-    -- Auto-save notes
-    if config.get_config().auto_save then
-        vim.api.nvim_create_autocmd('TextChanged', {
-            pattern = vault_path .. '/*.md',
+    -- Set up auto-save if enabled
+    if user_config and user_config.auto_save then
+        vim.api.nvim_create_autocmd({ 'TextChanged', 'TextChangedI' }, {
+            pattern = '*.md',
             callback = function()
-                vim.cmd('silent! write')
+                if vim.fn.expand('%:p'):find(config.get_vault_path(), 1, true) then
+                    vim.cmd('silent! write')
+                end
             end
         })
     end
+
+    -- Set up spell checking for notes
+    vim.api.nvim_create_augroup('NvimNotesSpell', { clear = true })
+    vim.api.nvim_create_autocmd({ 'BufRead', 'BufNewFile' }, {
+        group = 'NvimNotesSpell',
+        pattern = '*.md',
+        callback = function()
+            local file_path = vim.fn.expand('%:p')
+            if file_path:find(config.get_vault_path(), 1, true) then
+                config.setup_spell_checking()
+                -- Force spell settings to prevent German warnings
+                vim.opt_local.spelllang = 'en_us'
+                vim.opt_local.spell = false
+            end
+        end
+    })
+
+    -- Additional autocommand to catch any spell setting changes
+    vim.api.nvim_create_autocmd({ 'OptionSet' }, {
+        group = 'NvimNotesSpell',
+        pattern = 'spelllang',
+        callback = function()
+            -- Prevent German spell language globally, not just in notes
+            local current_spelllang = vim.opt.spelllang:get()
+            for _, lang in ipairs(current_spelllang) do
+                if lang:match('de') then
+                    vim.opt.spelllang = 'en_us'
+                    vim.opt.spell = false
+                    print('nvim-notes: Prevented German spell check, using English instead')
+                    break
+                end
+            end
+        end
+    })
+
+    -- Global autocommand to prevent German spell checking anywhere
+    vim.api.nvim_create_autocmd({ 'BufEnter', 'BufRead', 'BufNewFile' }, {
+        group = 'NvimNotesSpell',
+        pattern = '*',
+        callback = function()
+            local current_spelllang = vim.opt_local.spelllang:get()
+            for _, lang in ipairs(current_spelllang) do
+                if lang:match('de') then
+                    vim.opt_local.spelllang = 'en_us'
+                    vim.opt_local.spell = false
+                    break
+                end
+            end
+        end
+    })
 
     -- Set up keybindings
     if not user_config or user_config.disable_keybindings ~= true then
@@ -68,6 +131,8 @@ function M.setup_keybindings()
             vim.tbl_extend('force', opts, { desc = 'Preview current note' }))
         vim.keymap.set('n', '<leader><tab>i', M.show_index,
             vim.tbl_extend('force', opts, { desc = 'Show notes dashboard' }))
+        vim.keymap.set('n', '<leader><tab>S', M.sync,
+            vim.tbl_extend('force', opts, { desc = 'Sync notes with GitHub' }))
 
         -- Register with which-key (v3 format)
         wk.add({
@@ -79,6 +144,7 @@ function M.setup_keybindings()
             { "<leader><tab>d", M.delete_note,      desc = "Delete current note" },
             { "<leader><tab>v", M.preview_markdown, desc = "Preview current note" },
             { "<leader><tab>i", M.show_index,       desc = "Show notes dashboard" },
+            { "<leader><tab>S", M.sync,             desc = "Sync notes with GitHub" },
         })
     end
 end
@@ -96,8 +162,17 @@ function M.new_note(name)
         end
     end
 
+    -- If no name provided, prompt for one
     if not name or name == '' then
-        name = os.date('%Y-%m-%d')
+        local current_datetime = os.date('%Y-%m-%d %H:%M')
+        local input_name = vim.fn.input('📝 Note name (or press Enter for "' .. current_datetime .. '"): ')
+
+        if input_name and input_name ~= '' then
+            name = input_name
+        else
+            -- Use current date-time if no name provided
+            name = current_datetime
+        end
     end
 
     -- Ensure name has .md extension
@@ -342,6 +417,7 @@ function M.show_index()
     table.insert(lines, '')
     table.insert(lines, '  `<tab>n` New Note    `<tab>s` Search    `<tab>t` Tags')
     table.insert(lines, '  `<tab>p` Pin Toggle  `<tab>d` Delete    `<tab>v` Preview')
+    table.insert(lines, '  `<tab>S` Sync')
     table.insert(lines, '')
     table.insert(lines, '_Press ESC to close, ? for help_')
 
@@ -379,6 +455,11 @@ function M.show_index()
         close_popup()
         M.preview_markdown()
     end, { noremap = true })
+    popup:map('n', 'S', function()
+        close_popup()
+        M.sync()
+    end, { noremap = true })
+
     popup:map('n', '?', function()
         vim.notify('Dashboard Help:\n\n' ..
             'n - New note\n' ..
@@ -386,6 +467,7 @@ function M.show_index()
             't - Search by tags\n' ..
             'd - Delete current note\n' ..
             'v - Preview current note\n' ..
+            'S - Sync notes with GitHub\n' ..
             'q/ESC - Close dashboard', vim.log.levels.INFO)
     end, { noremap = true })
 
@@ -487,6 +569,12 @@ function M.delete_note()
     else
         print('Failed to delete note "' .. note_name .. '"')
     end
+end
+
+-- GitHub sync - minimal one-command solution
+function M.sync()
+    local github = require('nvim-notes.github')
+    github.sync()
 end
 
 return M

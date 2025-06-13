@@ -123,78 +123,50 @@ function M.search_all(query)
     M.show_search_results(results, 'Search: ' .. query)
 end
 
--- Show search results using FZF
+-- Show search results using vim.ui.select
 function M.show_search_results(results, title)
     if #results == 0 then
         print('No results found')
         return
     end
 
-    -- Check if fzf is available
-    if vim.fn.executable('fzf') == 0 then
-        print('FZF not found. Please install fzf: https://github.com/junegunn/fzf')
-        return
-    end
-
-    -- Format results for FZF display
-    local fzf_lines = {}
+    -- Format results for display
+    local options = {}
     local result_map = {}
 
     for i, result in ipairs(results) do
-        local display_line = string.format('%s (%d matches) - %s - %s',
+        local display_line = string.format('%d. %s (%d matches) - %s',
+            i,
             result.note.title,
             result.match_count,
-            result.note.modified,
-            result.note.relative_path
+            result.note.created or result.note.modified:match('%d%d%d%d%-%d%d%-%d%d') or 'Unknown'
         )
-        table.insert(fzf_lines, display_line)
+        table.insert(options, display_line)
         result_map[display_line] = result
     end
 
-    -- FZF options
-    local fzf_opts = {
-        source = fzf_lines,
-        sink = function(selected)
-            if selected and result_map[selected] then
-                local result = result_map[selected]
-                vim.cmd('edit ' .. result.note.path)
-                -- If there are specific line matches, jump to the first one
-                if #result.matches > 0 and result.matches[1].line_number > 0 then
-                    vim.api.nvim_win_set_cursor(0, { result.matches[1].line_number, 0 })
-                end
-            end
+    vim.ui.select(options, {
+        prompt = title .. ': ',
+        format_item = function(item)
+            return item
         end,
-        options = {
-            '--prompt=' .. title .. ': ',
-            '--height=60%',
-            '--layout=reverse',
-            '--border',
-            '--info=inline',
-            '--preview=bat --style=numbers --color=always --line-range=:50 {}',
-            '--preview-window=right:50%:wrap',
-            '--bind=ctrl-/:toggle-preview',
-            '--header=' .. title .. ' - Enter to open, Ctrl-/ toggle preview',
-        }
-    }
-
-    if vim.fn.exists('*fzf#run') == 1 then
-        vim.fn['fzf#run'](fzf_opts)
-    else
-        print('FZF vim plugin not available')
-    end
+    }, function(choice)
+        if choice and result_map[choice] then
+            local result = result_map[choice]
+            vim.cmd('edit ' .. result.note.path)
+            -- If there are specific line matches, jump to the first one
+            if #result.matches > 0 and result.matches[1].line_number > 0 then
+                vim.api.nvim_win_set_cursor(0, { result.matches[1].line_number, 0 })
+            end
+        end
+    end)
 end
 
--- Interactive search using FZF
+-- Interactive search using vim.ui.select
 function M.interactive_search()
     local notes = utils.get_all_notes()
     if #notes == 0 then
         print('No notes found in vault')
-        return
-    end
-
-    -- Check if fzf is available
-    if vim.fn.executable('fzf') == 0 then
-        print('FZF not found. Please install fzf: https://github.com/junegunn/fzf')
         return
     end
 
@@ -219,82 +191,54 @@ function M.interactive_search()
         end
     end
 
-    -- Format notes for FZF display (pinned first)
-    local fzf_lines = {}
+    -- Format notes for display (pinned first)
+    local options = {}
     local note_map = {}
+    local counter = 1
 
     -- Add pinned notes first with pin indicator
     for _, note in ipairs(pinned_list) do
-        local display_line = string.format('📌 %s (%s) - %s',
+        local tags = utils.extract_tags(note.path)
+        local tag_indicator = #tags > 0 and '🏷️ ' or ''
+        local display_line = string.format('📌 %s%s - %s',
+            tag_indicator,
             note.title,
-            note.modified,
-            note.relative_path
+            note.created or note.modified:match('%d%d%d%d%-%d%d%-%d%d') or 'Unknown'
         )
-        table.insert(fzf_lines, display_line)
+        table.insert(options, display_line)
         note_map[display_line] = note
+        counter = counter + 1
     end
 
     -- Add unpinned notes
     for _, note in ipairs(unpinned_list) do
-        local display_line = string.format('%s (%s) - %s',
+        local tags = utils.extract_tags(note.path)
+        local tag_indicator = #tags > 0 and '🏷️ ' or ''
+        local display_line = string.format('%s%s - %s',
+            tag_indicator,
             note.title,
-            note.modified,
-            note.relative_path
+            note.created or note.modified:match('%d%d%d%d%-%d%d%-%d%d') or 'Unknown'
         )
-        table.insert(fzf_lines, display_line)
+        table.insert(options, display_line)
         note_map[display_line] = note
+        counter = counter + 1
     end
 
-    local header_text = 'Enter to open note, Esc to cancel'
+    local prompt = '🔍 Search Notes: '
     if #pinned_list > 0 then
-        header_text = string.format('📌 %d pinned notes shown first • %s', #pinned_list, header_text)
+        prompt = string.format('🔍 Search Notes (%d pinned): ', #pinned_list)
     end
 
-    print('Found ' ..
-        #notes .. ' notes to search through' .. (#pinned_list > 0 and ' (' .. #pinned_list .. ' pinned)' or ''))
-
-    -- Use fzf#run if available
-    if vim.fn.exists('*fzf#run') == 1 then
-        print('Using fzf#run')
-
-        local fzf_opts = {
-            source = fzf_lines,
-            sink = function(selected)
-                if selected and note_map[selected] then
-                    vim.cmd('edit ' .. note_map[selected].path)
-                end
-            end,
-            options = {
-                '--prompt=🔍 Search Notes: ',
-                '--height=60%',
-                '--layout=reverse',
-                '--border',
-                '--info=inline',
-                '--header=' .. header_text,
-            }
-        }
-
-        vim.fn['fzf#run'](fzf_opts)
-    else
-        print('fzf#run not available, using vim.ui.select fallback')
-
-        -- Fallback to vim.ui.select
-        local options = {}
-        for _, line in ipairs(fzf_lines) do
-            table.insert(options, line)
+    vim.ui.select(options, {
+        prompt = prompt,
+        format_item = function(item)
+            return item
+        end,
+    }, function(choice)
+        if choice and note_map[choice] then
+            vim.cmd('edit ' .. note_map[choice].path)
         end
-
-        vim.ui.select(options, {
-            prompt = '🔍 Search Notes: ',
-            format_item = function(item)
-                return item
-            end,
-        }, function(choice)
-            if choice and note_map[choice] then
-                vim.cmd('edit ' .. note_map[choice].path)
-            end
-        end)
-    end
+    end)
 end
 
 -- Live note finder - shows all notes with live filtering

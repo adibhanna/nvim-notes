@@ -4,6 +4,12 @@ if vim.g.loaded_nvim_notes == 1 then
 end
 vim.g.loaded_nvim_notes = 1
 
+-- Immediately prevent German spell check warnings
+vim.opt.spelllang = 'en_us'
+vim.opt.spell = false
+vim.cmd('silent! set spelllang=en_us')
+vim.cmd('silent! set nospell')
+
 local notes = require('nvim-notes')
 
 -- Commands
@@ -38,6 +44,10 @@ end, { desc = 'Preview current note in markdown' })
 vim.api.nvim_create_user_command('NotesIndex', function()
     notes.show_index()
 end, { desc = 'Show notes index/dashboard' })
+
+vim.api.nvim_create_user_command('NotesSync', function()
+    notes.sync()
+end, { desc = 'Sync notes with GitHub (creates repo on first use)' })
 
 -- Set up keybindings with which-key if available
 local function set_keybindings()

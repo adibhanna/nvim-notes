@@ -26,6 +26,42 @@ function M.get_all_notes()
     return notes
 end
 
+-- Extract creation date from note content
+function M.get_note_creation_date(file_path)
+    if vim.fn.filereadable(file_path) == 0 then
+        return nil
+    end
+
+    local lines = vim.fn.readfile(file_path, '', 10) -- Read first 10 lines
+
+    -- Look for "Created:" line
+    for _, line in ipairs(lines) do
+        local created_match = line:match('^Created:%s*(.+)')
+        if created_match then
+            -- Try to parse the date
+            local date_part = created_match:match('(%d%d%d%d%-%d%d%-%d%d)')
+            if date_part then
+                return date_part
+            end
+            -- If no date pattern found, return the whole match
+            return created_match:gsub('^%s*(.-)%s*$', '%1')
+        end
+    end
+
+    -- Fallback to file creation time if available
+    local stat = vim.loop.fs_stat(file_path)
+    if stat and stat.birthtime then
+        return os.date('%Y-%m-%d', stat.birthtime.sec)
+    end
+
+    -- Final fallback to modification time
+    if stat then
+        return os.date('%Y-%m-%d', stat.mtime.sec)
+    end
+
+    return nil
+end
+
 -- Get information about a specific note
 function M.get_note_info(file_path)
     if vim.fn.filereadable(file_path) == 0 then
@@ -39,11 +75,13 @@ function M.get_note_info(file_path)
 
     local title = M.get_note_title(file_path)
     local relative_path = file_path:gsub(config.get_vault_path() .. '/', '')
+    local created = M.get_note_creation_date(file_path)
 
     return {
         path = file_path,
         relative_path = relative_path,
         title = title,
+        created = created,
         modified_time = stat.mtime.sec,
         modified = os.date('%Y-%m-%d %H:%M', stat.mtime.sec),
         size = stat.size
@@ -52,18 +90,46 @@ end
 
 -- Extract title from note (first heading or filename)
 function M.get_note_title(file_path)
-    local lines = vim.fn.readfile(file_path, '', 5) -- Read first 5 lines
+    local lines = vim.fn.readfile(file_path, '', 10) -- Read first 10 lines
+    local headings = {}
 
-    -- Look for first heading
+    -- Collect all headings
     for _, line in ipairs(lines) do
         local heading = line:match('^#%s+(.+)')
         if heading then
+            table.insert(headings, heading)
+        end
+    end
+
+    -- If we have headings, prefer non-date headings
+    for _, heading in ipairs(headings) do
+        -- Skip headings that are just dates (YYYY-MM-DD format) or look like dates
+        if not heading:match('^%d%d%d%d%-%d%d%-%d%d$') and
+            not heading:match('^%d%d%d%d%-%d%d%-%d%d%s') and
+            not heading:match('^%d+/%d+/%d+') then
             return heading
         end
     end
 
-    -- Fallback to filename without extension
+    -- Fallback to filename without extension (prefer this over date headings)
     local filename = vim.fn.fnamemodify(file_path, ':t:r')
+
+    -- If filename is also a date pattern, try to find a better heading
+    if filename:match('^%d%d%d%d%-%d%d%-%d%d$') then
+        -- Look for second-level headings (##) that might be better
+        for _, line in ipairs(lines) do
+            local heading = line:match('^##%s+(.+)')
+            if heading and not heading:match('^%d%d%d%d%-%d%d%-%d%d') then
+                return heading
+            end
+        end
+
+        -- If all else fails, use the first heading even if it's a date
+        if #headings > 0 then
+            return headings[1]
+        end
+    end
+
     return filename
 end
 
