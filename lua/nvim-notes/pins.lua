@@ -4,251 +4,118 @@ local utils = require('nvim-notes.utils')
 local M = {}
 
 local pinned_notes = {}
-local db_path = nil
+local pins_file_path = nil
 
--- Initialize database path and create tables
-local function init_database()
-    if not db_path then
-        -- Use the vault directory instead of system data directory
+-- Initialize pins file path
+local function init_pins_file()
+    if not pins_file_path then
         local vault_path = config.get_vault_path()
-        local data_dir = vault_path .. '/.nvim-notes'
-        db_path = data_dir .. '/pins.db'
-
-        print('DEBUG: Vault path: ' .. vault_path)
-        print('DEBUG: Data directory: ' .. data_dir)
-        print('DEBUG: Database path: ' .. db_path)
-
-        -- Create directory if it doesn't exist
-        if not vim.fn.isdirectory(data_dir) then
-            print('DEBUG: Directory does not exist, creating: ' .. data_dir)
-            local success = vim.fn.mkdir(data_dir, 'p')
-            print('DEBUG: mkdir result: ' .. tostring(success))
-            if success == 0 then
-                print('ERROR: Failed to create nvim-notes data directory: ' .. data_dir)
-                return false
-            end
-            print('DEBUG: Directory created successfully')
-        else
-            print('DEBUG: Directory already exists')
-        end
-
-        -- Double-check the directory exists after creation
-        local dir_exists = vim.fn.isdirectory(data_dir)
-        print('DEBUG: Directory exists check: ' .. tostring(dir_exists))
-
-        -- Check directory permissions
-        local dir_readable = vim.fn.filereadable(data_dir)
-        local dir_writable = vim.fn.filewritable(data_dir)
-        print('DEBUG: Directory readable: ' .. tostring(dir_readable))
-        print('DEBUG: Directory writable: ' .. tostring(dir_writable))
-
-        -- Verify directory exists and is writable
-        if not vim.fn.isdirectory(data_dir) then
-            print('ERROR: Directory still does not exist after creation attempt')
-            return false
-        end
-
-        -- Test if we can write to the directory
-        local test_file = data_dir .. '/test_write.tmp'
-        local test_handle = io.open(test_file, 'w')
-        if test_handle then
-            test_handle:write('test')
-            test_handle:close()
-            os.remove(test_file) -- Clean up test file
-            print('DEBUG: Directory is writable')
-        else
-            print('ERROR: Cannot write to directory: ' .. data_dir)
-            return false
-        end
-
-        -- Create database and tables if they don't exist
-        print('DEBUG: Creating database tables')
-        if not M.create_tables() then
-            print('ERROR: Failed to create database tables')
-            return false
-        end
+        pins_file_path = vault_path .. '/.nvim-notes-pins'
+        print('DEBUG: Pins file path: ' .. pins_file_path)
     end
     return true
 end
 
--- Execute SQL command
-local function execute_sql(sql, params)
-    params = params or {}
-
-    -- Simple file-based database implementation
-    -- We'll store data in a simple text format for reliability
-    local success, result = pcall(function()
-        if sql:match('^CREATE TABLE') then
-            -- Table creation - just ensure file exists
-            local db_file = io.open(db_path, 'a')
-            if db_file then
-                db_file:close()
-                return true
-            end
-            return false
-        elseif sql:match('^INSERT') then
-            -- Insert operation
-            local note_path = params[1]
-            local timestamp = params[2] or os.time()
-
-            print('DEBUG: INSERT operation - note_path: ' ..
-                tostring(note_path) .. ', timestamp: ' .. tostring(timestamp))
-            print('DEBUG: Attempting to open file for append: ' .. db_path)
-
-            local db_file = io.open(db_path, 'a')
-            if db_file then
-                print('DEBUG: File opened successfully, writing data')
-                local line = string.format('%s|%d\n', note_path, timestamp)
-                print('DEBUG: Writing line: ' .. line:sub(1, -2)) -- Remove trailing newline for display
-
-                local write_success = db_file:write(line)
-                db_file:close()
-
-                if write_success then
-                    print('DEBUG: Write successful')
-                    return true
-                else
-                    print('DEBUG: Write failed')
-                    return false
-                end
-            else
-                print('DEBUG: Failed to open file for writing: ' .. db_path)
-                return false
-            end
-        elseif sql:match('^DELETE') then
-            -- Delete operation
-            local note_path = params[1]
-
-            -- Read all lines
-            local lines = {}
-            local db_file = io.open(db_path, 'r')
-            if db_file then
-                for line in db_file:lines() do
-                    local path = line:match('^([^|]+)')
-                    if path ~= note_path then
-                        table.insert(lines, line)
-                    end
-                end
-                db_file:close()
-
-                -- Write back without the deleted entry
-                db_file = io.open(db_path, 'w')
-                if db_file then
-                    for _, line in ipairs(lines) do
-                        db_file:write(line .. '\n')
-                    end
-                    db_file:close()
-                    return true
-                end
-            end
-            return false
-        elseif sql:match('^SELECT') then
-            -- Select operation
-            local results = {}
-            local db_file = io.open(db_path, 'r')
-            if db_file then
-                for line in db_file:lines() do
-                    if line ~= '' then
-                        local path, timestamp = line:match('^([^|]+)|(%d+)')
-                        if path and timestamp then
-                            table.insert(results, { path = path, timestamp = tonumber(timestamp) })
-                        end
-                    end
-                end
-                db_file:close()
-            end
-            return results
-        end
-
-        return false
-    end)
-
-    if success then
-        return result
-    else
-        print('Database operation failed: ' .. tostring(result))
+-- Save pinned notes to file
+local function save_pins_to_file()
+    if not init_pins_file() then
         return false
     end
+
+    print('DEBUG: Saving pins to file: ' .. pins_file_path)
+    local file = io.open(pins_file_path, 'w')
+    if not file then
+        print('ERROR: Could not open pins file for writing')
+        return false
+    end
+
+    for _, note_path in ipairs(pinned_notes) do
+        file:write(note_path .. '\n')
+    end
+    file:close()
+    print('DEBUG: Successfully saved ' .. #pinned_notes .. ' pins to file')
+    return true
 end
 
--- Create database tables
-function M.create_tables()
-    local sql = [[
-        CREATE TABLE IF NOT EXISTS pinned_notes (
-            note_path TEXT PRIMARY KEY,
-            pinned_at INTEGER
-        )
-    ]]
-    print('DEBUG: Executing CREATE TABLE')
-    local result = execute_sql(sql)
-    print('DEBUG: CREATE TABLE result: ' .. tostring(result))
-    return result
+-- Load pinned notes from file
+local function load_pins_from_file()
+    if not init_pins_file() then
+        return false
+    end
+
+    pinned_notes = {}
+    print('DEBUG: Loading pins from file: ' .. pins_file_path)
+
+    local file = io.open(pins_file_path, 'r')
+    if not file then
+        print('DEBUG: Pins file does not exist yet, starting with empty list')
+        return true
+    end
+
+    for line in file:lines() do
+        line = line:match('^%s*(.-)%s*$') -- trim whitespace
+        if line and line ~= '' then
+            table.insert(pinned_notes, line)
+        end
+    end
+    file:close()
+
+    print('DEBUG: Loaded ' .. #pinned_notes .. ' pins from file')
+    return true
 end
 
--- Load pinned notes from database
+-- Load pinned notes from file
 function M.load_pinned_notes()
-    if not init_database() then
-        print('Failed to initialize database')
+    if not load_pins_from_file() then
+        print('Failed to load pinned notes')
         return
-    end
-
-    local sql = "SELECT note_path, pinned_at FROM pinned_notes ORDER BY pinned_at DESC"
-    local results = execute_sql(sql)
-
-    if results then
-        pinned_notes = {}
-        for _, row in ipairs(results) do
-            table.insert(pinned_notes, row.path)
-        end
-        print('Loaded ' .. #pinned_notes .. ' pinned notes from database')
-    else
-        print('Failed to load pinned notes from database')
     end
 
     -- Clean up pinned notes that no longer exist
     M.clean_pinned_notes()
 end
 
--- Save pinned note to database
+-- Add note to pins
 local function save_pin(note_path)
     print('DEBUG: Attempting to save pin for: ' .. note_path)
 
-    if not init_database() then
-        print('DEBUG: Database initialization failed')
-        return false
+    -- Add to memory if not already there
+    if not vim.tbl_contains(pinned_notes, note_path) then
+        table.insert(pinned_notes, 1, note_path) -- Add to front
+        print('DEBUG: Added to pinned_notes list')
+    else
+        print('DEBUG: Note already in pinned list')
     end
 
-    print('DEBUG: Database initialized, db_path: ' .. tostring(db_path))
-
-    local sql = "INSERT OR REPLACE INTO pinned_notes (note_path, pinned_at) VALUES (?, ?)"
-    local timestamp = os.time()
-    print('DEBUG: Executing SQL with params: ' .. note_path .. ', ' .. timestamp)
-
-    local success = execute_sql(sql, { note_path, timestamp })
-
-    if success then
-        print('Pinned note saved to database: ' .. note_path)
+    -- Save to file
+    if save_pins_to_file() then
+        print('Successfully pinned note: ' .. note_path)
         return true
     else
-        print('Failed to save pinned note to database: ' .. note_path)
+        print('Failed to save pins to file: ' .. note_path)
         return false
     end
 end
 
--- Remove pinned note from database
+-- Remove note from pins
 local function remove_pin(note_path)
-    if not init_database() then
-        return false
+    print('DEBUG: Attempting to remove pin for: ' .. note_path)
+
+    -- Remove from memory
+    for i, pinned_path in ipairs(pinned_notes) do
+        if pinned_path == note_path then
+            table.remove(pinned_notes, i)
+            print('DEBUG: Removed from pinned_notes list')
+            break
+        end
     end
 
-    local sql = "DELETE FROM pinned_notes WHERE note_path = ?"
-    local success = execute_sql(sql, { note_path })
-
-    if success then
-        print('Removed pinned note from database: ' .. note_path)
+    -- Save to file
+    if save_pins_to_file() then
+        print('Successfully unpinned note: ' .. note_path)
         return true
     else
-        print('Failed to remove pinned note from database: ' .. note_path)
+        print('Failed to save pins to file: ' .. note_path)
         return false
     end
 end
@@ -287,12 +154,6 @@ function M.toggle_pin(note_path)
         print('DEBUG: Attempting to unpin note')
         local success = remove_pin(note_path)
         if success then
-            for i, pinned_path in ipairs(pinned_notes) do
-                if pinned_path == note_path then
-                    table.remove(pinned_notes, i)
-                    break
-                end
-            end
             print('Successfully unpinned: ' .. note_path)
             return false
         else
@@ -304,7 +165,6 @@ function M.toggle_pin(note_path)
         print('DEBUG: Attempting to pin note')
         local success = save_pin(note_path)
         if success then
-            table.insert(pinned_notes, note_path)
             print('Successfully pinned: ' .. note_path)
             return true
         else
