@@ -363,8 +363,40 @@ function M.interactive_search()
     update_results()
     update_preview()
 
-    -- Set buffer to be editable
+    -- Set buffer to be editable and disable completion
     vim.api.nvim_buf_set_option(search_popup.bufnr, 'modifiable', true)
+    vim.api.nvim_buf_set_option(search_popup.bufnr, 'buftype', 'prompt')
+    vim.api.nvim_buf_set_option(search_popup.bufnr, 'filetype', '')
+
+    -- Disable completion plugins
+    vim.api.nvim_buf_set_var(search_popup.bufnr, 'cmp_enabled', false)
+    vim.api.nvim_buf_set_var(search_popup.bufnr, 'completion_enable', false)
+
+    -- Disable blink.cmp specifically
+    pcall(function()
+        vim.api.nvim_buf_set_var(search_popup.bufnr, 'blink_cmp_enabled', false)
+    end)
+
+    -- Set additional buffer options to prevent completion
+    vim.api.nvim_win_set_option(search_popup.winid, 'completefunc', '')
+    vim.api.nvim_win_set_option(search_popup.winid, 'omnifunc', '')
+
+    -- Create autocmd to disable completion when entering this buffer
+    vim.api.nvim_create_autocmd({ 'BufEnter', 'InsertEnter' }, {
+        buffer = search_popup.bufnr,
+        callback = function()
+            -- Disable various completion options
+            vim.opt_local.complete = ''
+            vim.opt_local.completeopt = ''
+
+            -- Disable completion plugins via buffer variables
+            vim.b.cmp_enabled = false
+            vim.b.completion_enable = false
+            pcall(function()
+                vim.b.blink_cmp_enabled = false
+            end)
+        end,
+    })
 
     -- Focus search and enter insert mode
     vim.api.nvim_set_current_win(search_popup.winid)

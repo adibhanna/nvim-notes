@@ -6,19 +6,19 @@ endif
 runtime! syntax/markdown.vim
 
 " Enhanced syntax for notes
-syntax match notesTag '#[a-zA-Z0-9_-]\+' contained
-syntax match notesTagLine '^Tags:.*$' contains=notesTag
+syntax match notesTag '#[a-zA-Z0-9_-]\+' 
+syntax match notesTagLine '^Tags:.*$'
 syntax match notesCreatedLine '^Created:.*$'
 syntax match notesModifiedLine '^Modified:.*$'
 syntax match notesDateStamp '\d\{4\}-\d\{2\}-\d\{2\}'
 syntax match notesTimeStamp '\d\{2\}:\d\{2\}'
 
 " Highlight pinned indicator
-syntax match notesPinned '📌' contained
+syntax match notesPinned '📌'
 
-" Links and references
-syntax match notesWikiLink '\[\[.\{-}\]\]'
-syntax match notesReference '\[.\{-}\]([^)]\+)'
+" Links and references  
+syntax match notesWikiLink '\[\[[^\]]\+\]\]'
+syntax match notesReference '\[[^\]]\+\]([^)]\+)'
 
 " Task lists (enhanced)
 syntax match notesTaskDone '^\s*- \[x\].*$'
@@ -27,9 +27,9 @@ syntax match notesTaskInProgress '^\s*- \[~\].*$'
 syntax match notesTaskCancelled '^\s*- \[-\].*$'
 
 " Priority indicators
-syntax match notesPriorityHigh '!\{3\}'
-syntax match notesPriorityMedium '!\{2\}'
-syntax match notesPriorityLow '!'
+syntax match notesPriorityHigh '!!!'
+syntax match notesPriorityMedium '!!'
+syntax match notesPriorityLow '\<!\>'
 
 " Note sections
 syntax region notesFrontmatter start=/^---$/ end=/^---$/
@@ -37,14 +37,14 @@ syntax match notesSection '^## .\+$'
 syntax match notesSubsection '^### .\+$'
 
 " Callouts and admonitions
-syntax region notesCalloutInfo start=/^> \[!INFO\]/ end=/^\(>\s*\)\@!/
-syntax region notesCalloutNote start=/^> \[!NOTE\]/ end=/^\(>\s*\)\@!/
-syntax region notesCalloutWarning start=/^> \[!WARNING\]/ end=/^\(>\s*\)\@!/
-syntax region notesCalloutError start=/^> \[!ERROR\]/ end=/^\(>\s*\)\@!/
-syntax region notesCalloutTip start=/^> \[!TIP\]/ end=/^\(>\s*\)\@!/
+syntax region notesCalloutInfo start=/^> \[!INFO\]/ end=/^$/
+syntax region notesCalloutNote start=/^> \[!NOTE\]/ end=/^$/
+syntax region notesCalloutWarning start=/^> \[!WARNING\]/ end=/^$/
+syntax region notesCalloutError start=/^> \[!ERROR\]/ end=/^$/
+syntax region notesCalloutTip start=/^> \[!TIP\]/ end=/^$/
 
 " Highlights
-syntax match notesHighlight '==.\{-}=='
+syntax match notesHighlight '==[^=]\+==='
 
 " Define colors
 highlight default link notesTag Identifier
