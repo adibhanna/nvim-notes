@@ -336,11 +336,10 @@ function M.interactive_search()
 
     -- Function to update search prompt
     local function update_search()
-        local prompt_line = '> ' .. search_query
-        vim.api.nvim_buf_set_lines(search_popup.bufnr, 0, -1, false, { prompt_line })
+        vim.api.nvim_buf_set_lines(search_popup.bufnr, 0, -1, false, { search_query })
 
         -- Position cursor at the end
-        vim.api.nvim_win_set_cursor(search_popup.winid, { 1, #prompt_line })
+        vim.api.nvim_win_set_cursor(search_popup.winid, { 1, #search_query })
     end
 
     -- Function to open selected note
@@ -365,8 +364,8 @@ function M.interactive_search()
 
     -- Set buffer to be editable and disable completion
     vim.api.nvim_buf_set_option(search_popup.bufnr, 'modifiable', true)
-    vim.api.nvim_buf_set_option(search_popup.bufnr, 'buftype', 'prompt')
     vim.api.nvim_buf_set_option(search_popup.bufnr, 'filetype', '')
+    vim.api.nvim_buf_set_option(search_popup.bufnr, 'bufhidden', 'wipe')
 
     -- Disable completion plugins
     vim.api.nvim_buf_set_var(search_popup.bufnr, 'cmp_enabled', false)
@@ -387,7 +386,7 @@ function M.interactive_search()
         callback = function()
             -- Disable various completion options
             vim.opt_local.complete = ''
-            vim.opt_local.completeopt = ''
+            vim.opt_local.completeopt = 'noinsert,noselect'
 
             -- Disable completion plugins via buffer variables
             vim.b.cmp_enabled = false
@@ -441,20 +440,31 @@ function M.interactive_search()
 
     -- Set up live search
     local search_timer = nil
-    search_popup:on(event.TextChangedI, function()
+    local function do_search()
         if search_timer then
             vim.fn.timer_stop(search_timer)
         end
 
         search_timer = vim.fn.timer_start(150, function()
             local current_line = vim.api.nvim_buf_get_lines(search_popup.bufnr, 0, 1, false)[1] or ''
-            search_query = current_line:gsub('^> ', '')
+            local new_query = current_line
 
-            filter_notes(search_query)
-            update_results()
-            update_preview()
+            -- Only update if query actually changed
+            if new_query ~= search_query then
+                search_query = new_query
+                filter_notes(search_query)
+                update_results()
+                update_preview()
+            end
         end)
-    end)
+    end
+
+    -- Listen to both TextChanged and TextChangedI events
+    search_popup:on(event.TextChangedI, do_search)
+    search_popup:on(event.TextChanged, do_search)
+
+    -- Also listen to character input events
+    search_popup:on(event.InsertCharPre, do_search)
 
     -- Key mappings for results popup
     results_popup:map('n', '<CR>', function()
