@@ -9,9 +9,12 @@ local db_path = nil
 -- Initialize database path and create tables
 local function init_database()
     if not db_path then
-        local data_dir = vim.fn.stdpath('data') .. '/nvim-notes'
-        db_path = data_dir .. '/notes.db'
+        -- Use the vault directory instead of system data directory
+        local vault_path = config.get_vault_path()
+        local data_dir = vault_path .. '/.nvim-notes'
+        db_path = data_dir .. '/pins.db'
 
+        print('DEBUG: Vault path: ' .. vault_path)
         print('DEBUG: Data directory: ' .. data_dir)
         print('DEBUG: Database path: ' .. db_path)
 
