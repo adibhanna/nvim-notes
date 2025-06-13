@@ -232,8 +232,12 @@ end
 
 -- Toggle pin status of a note
 function M.toggle_pin(note_path)
+    print('DEBUG: Toggle pin called for: ' .. note_path)
+    print('DEBUG: Currently pinned: ' .. tostring(M.is_pinned(note_path)))
+
     if M.is_pinned(note_path) then
         -- Unpin
+        print('DEBUG: Attempting to unpin note')
         local success = remove_pin(note_path)
         if success then
             for i, pinned_path in ipairs(pinned_notes) do
@@ -242,18 +246,23 @@ function M.toggle_pin(note_path)
                     break
                 end
             end
+            print('Successfully unpinned: ' .. note_path)
             return false
         else
-            error('Failed to unpin note')
+            print('Failed to unpin note: ' .. note_path)
+            return nil
         end
     else
         -- Pin
+        print('DEBUG: Attempting to pin note')
         local success = save_pin(note_path)
         if success then
             table.insert(pinned_notes, note_path)
+            print('Successfully pinned: ' .. note_path)
             return true
         else
-            error('Failed to pin note')
+            print('Failed to pin note: ' .. note_path)
+            return nil
         end
     end
 end
