@@ -14,7 +14,10 @@ local function init_pinned_file_path()
 
         -- Create directory if it doesn't exist
         if not vim.fn.isdirectory(data_dir) then
-            vim.fn.mkdir(data_dir, 'p')
+            local success = vim.fn.mkdir(data_dir, 'p')
+            if success == 0 then
+                print('Warning: Failed to create nvim-notes data directory: ' .. data_dir)
+            end
         end
     end
 end
@@ -41,8 +44,20 @@ end
 function M.save_pinned_notes()
     init_pinned_file_path()
 
+    -- Ensure directory exists before writing
+    local data_dir = vim.fn.fnamemodify(pinned_file_path, ':h')
+    if not vim.fn.isdirectory(data_dir) then
+        local success = vim.fn.mkdir(data_dir, 'p')
+        if success == 0 then
+            error('Failed to create directory: ' .. data_dir)
+        end
+    end
+
     local encoded = vim.fn.json_encode(pinned_notes)
-    vim.fn.writefile({ encoded }, pinned_file_path)
+    local success = pcall(vim.fn.writefile, { encoded }, pinned_file_path)
+    if not success then
+        error('Failed to write pinned notes file: ' .. pinned_file_path)
+    end
 end
 
 -- Clean up pinned notes that no longer exist
@@ -223,6 +238,11 @@ function M.clear_all_pins()
         M.save_pinned_notes()
         print('All pinned notes cleared')
     end
+end
+
+-- Initialize pins module
+function M.init()
+    M.load_pinned_notes()
 end
 
 return M

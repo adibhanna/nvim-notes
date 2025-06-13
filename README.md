@@ -22,7 +22,8 @@ A comprehensive note-taking plugin for Neovim with full markdown support, beauti
 {
   'adibhanna/nvim-notes',
   dependencies = {
-    'MunifTanjim/nui.nvim', -- Required for UI components
+    'junegunn/fzf', -- Required for fuzzy finding
+    'junegunn/fzf.vim', -- Required for fzf integration
   },
   config = function()
     require('nvim-notes').setup({
@@ -38,12 +39,32 @@ A comprehensive note-taking plugin for Neovim with full markdown support, beauti
 use {
   'adibhanna/nvim-notes',
   requires = {
-    'MunifTanjim/nui.nvim', -- Required for UI components
+    'junegunn/fzf', -- Required for fuzzy finding
+    'junegunn/fzf.vim', -- Required for fzf integration
   },
   config = function()
     require('nvim-notes').setup()
   end
 }
+```
+
+## 📋 Prerequisites
+
+Before installing, make sure you have FZF installed on your system:
+
+```bash
+# macOS
+brew install fzf
+
+# Ubuntu/Debian
+sudo apt install fzf
+
+# Arch Linux
+sudo pacman -S fzf
+
+# Or install via git
+git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
+~/.fzf/install
 ```
 
 ## ⚙️ Configuration
