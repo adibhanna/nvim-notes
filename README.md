@@ -1,18 +1,20 @@
 # nvim-notes
 
-A comprehensive note-taking plugin for Neovim with full markdown support, beautiful UI components, tagging, pinning, search functionality, and markdown preview capabilities.
+A comprehensive note-taking plugin for Neovim with full markdown support, beautiful UI components, tagging, pinning, search functionality, GitHub sync, and enhanced syntax highlighting.
 
 ## ✨ Features
 
-- **📝 Quick Note Creation**: Create notes with automatic date-based naming
+- **📝 Quick Note Creation**: Create notes with custom names or automatic date-based naming
 - **🔍 Powerful Search**: Search notes by content, filename, or tags using vim.ui.select
-- **🏷️ Tag Management**: Create, manage, and search by tags
-- **📌 Pin Notes**: Pin important notes for quick access
-- **👀 Markdown Preview**: Multiple preview options including terminal, browser, and floating windows
-- **🎨 Syntax Highlighting**: Enhanced markdown syntax with note-specific highlighting
+- **🏷️ Tag Management**: Create, manage, and search by tags with hashtag and YAML-style support
+- **📌 Pin Notes**: Pin important notes for quick access (pinned notes appear first in search)
+- **👀 Markdown Preview**: Multiple preview options including terminal and browser preview
+- **🎨 Enhanced Syntax**: Custom syntax highlighting for tags, dates, tasks, priorities, and more
 - **🗂️ Vault Management**: Organized note storage with customizable vault location
-- **✨ Beautiful UI**: Elegant menus and inputs powered by nui.nvim
-- **📊 Dashboard**: Beautiful popup overview of your notes, tags, and recent activity
+- **✨ Beautiful UI**: Elegant dashboard and menus powered by nui.nvim
+- **📊 Interactive Dashboard**: Beautiful popup overview with sync status and quick actions
+- **🔄 GitHub Sync**: One-command sync with automatic repository creation and backup
+- **🚀 Zero Dependencies**: Works with built-in vim.ui.select (no external fuzzy finder required)
 
 ## 📦 Installation
 
@@ -48,7 +50,7 @@ use {
 
 ## 📋 Prerequisites
 
-The plugin works out of the box with Neovim's built-in `vim.ui.select`. For enhanced search experience, you can optionally install:
+The plugin works out of the box with Neovim's built-in `vim.ui.select`. For enhanced experience, you can optionally install:
 
 ```bash
 # Optional: For better markdown preview
@@ -57,9 +59,11 @@ brew install glow
 # Optional: Alternative preview tools
 brew install bat
 cargo install mdcat
-```
 
-No external fuzzy finder dependencies required!
+# Required for GitHub sync
+brew install gh
+gh auth login
+```
 
 ## ⚙️ Configuration
 
@@ -77,8 +81,6 @@ require('nvim-notes').setup({
   conceal_level = 2,                         -- Conceal level for markdown
   disable_default_keybindings = false,       -- Disable default key mappings
   max_recent_notes = 10,                     -- Number of recent notes to show
-  spell_check = false,                       -- Enable spell checking for notes
-  spell_lang = 'en_us',                      -- Spell check language
 })
 ```
 
@@ -114,17 +116,17 @@ Available template variables:
 
 ### Commands
 
-| Command                   | Description                                      |
-| ------------------------- | ------------------------------------------------ |
-| `:NotesNew [name]`        | Create a new note (defaults to current date)     |
-| `:NotesSearch [query]`    | Search notes by content (pinned shown first)     |
-| `:NotesSearchTags [tags]` | Search notes by tags                             |
-| `:NotesPinToggle`         | Toggle pin status of current note                |
-| `:NotesDelete`            | Delete current note (with confirmation)          |
-| `:NotesPreview`           | Preview current note in markdown                 |
-| `:NotesIndex`             | Show notes dashboard popup                       |
-| `:NotesSetVault [path]`   | Set the notes vault directory                    |
-| `:NotesSync`              | Sync notes with GitHub (creates repo first time) |
+| Command                   | Description                                       |
+| ------------------------- | ------------------------------------------------- |
+| `:NotesNew [name]`        | Create a new note (prompts for name or uses date) |
+| `:NotesSearch [query]`    | Search notes by content (pinned shown first)      |
+| `:NotesSearchTags [tags]` | Search notes by tags                              |
+| `:NotesPinToggle`         | Toggle pin status of current note                 |
+| `:NotesDelete`            | Delete current note (with confirmation)           |
+| `:NotesPreview`           | Preview current note in markdown                  |
+| `:NotesIndex`             | Show notes dashboard popup                        |
+| `:NotesSetVault [path]`   | Set the notes vault directory                     |
+| `:NotesSync`              | Sync notes with GitHub (creates repo first time)  |
 
 ### Keybindings
 
@@ -151,9 +153,9 @@ The Notes Dashboard (`<leader><tab>i` or `:NotesIndex`) provides a beautiful pop
 - **📌 Pinned Notes**: Your most important notes at a glance
 - **🕐 Recent Activity**: Latest modified notes
 - **🏷️ Popular Tags**: Most used tags with counts
-- **⚡ Quick Actions**: Single-key shortcuts to common actions
-- **📱 Interactive**: Press `n`, `s`, `t`, `p`, `v` for instant actions
-- **❓ Help**: Press `?` for keyboard shortcuts
+- **🔄 Sync Status**: Last synced time, local changes, remote updates
+- **📱 Interactive**: ESC or 'q' to close, '?' for help
+- **🎯 Auto-focus**: Cursor automatically positioned in the popup
 
 ### Custom Keybindings
 
@@ -175,12 +177,14 @@ vim.keymap.set('n', '<leader>ns', notes.search_notes, { desc = 'Search notes' })
 ### 1. Quick Note Creation
 
 ```lua
--- Create a note with today's date
+-- Create a note (prompts for name, defaults to current date-time)
 :NotesNew
 
 -- Create a note with specific name
 :NotesNew "Meeting Notes"
 ```
+
+When creating a new note, you'll be prompted to enter a name. Press Enter to use the current date-time as the filename, or type a custom name.
 
 ### 2. Organizing with Tags
 
@@ -257,10 +261,12 @@ Pin frequently accessed notes for quick access:
 :NotesSearch
 ```
 
+Pinned notes are stored in a simple text file in your vault directory and appear first in all search results with a 📌 indicator.
+
 ### 4. Searching and Discovery
 
 ```lua
--- Search by content
+-- Search by content (pinned notes shown first)
 :NotesSearch "important meeting"
 
 -- Search by tags
@@ -269,6 +275,11 @@ Pin frequently accessed notes for quick access:
 -- Browse all notes  
 :NotesSearch
 ```
+
+Search results show pinned notes first, followed by regular notes. Each result displays:
+- Pin indicator (📌) for pinned notes
+- Tag indicator (🏷️) for notes with tags
+- Note name and creation date
 
 ### 5. Note Management
 
@@ -290,11 +301,17 @@ Get a quick overview of your notes:
 -- Open beautiful dashboard popup
 :NotesIndex
 
--- Or use the keybing
+-- Or use the keybinding
 <leader><tab>i
 ```
 
-The dashboard shows your vault stats, pinned notes, recent activity, and popular tags with interactive shortcuts for quick actions.
+The dashboard shows:
+- Vault statistics (total notes, pinned count, tag count)
+- Pinned notes list
+- Recent activity
+- Popular tags with counts
+- Sync status information
+- Interactive help (press '?' for shortcuts)
 
 ## 🔄 GitHub Sync & Backup
 
@@ -312,6 +329,9 @@ sudo apt install gh
 
 # Authenticate with GitHub
 gh auth login
+
+# Configure git authentication (fixes hanging issues)
+gh auth setup-git
 ```
 
 ### Usage
@@ -330,11 +350,13 @@ gh auth login
 ### Features
 
 - **🚀 Zero configuration**: Just run `:NotesSync`
-- **🔒 Private repositories**: Your notes stay private
-- **🔄 Bidirectional sync**: Pulls remote changes, then pushes local changes
-- **📝 Smart commits**: Automatic timestamped commits
+- **🔒 Private repositories**: Your notes stay private by default
+- **🔄 Bidirectional sync**: Pulls remote changes first, then pushes local changes
+- **📝 Smart commits**: Automatic timestamped commits with change summaries
 - **📱 Multi-device**: Use the same command on all devices
 - **💾 Backup**: Never lose your notes
+- **🔧 Error handling**: Graceful handling of conflicts and connectivity issues
+- **📊 Status tracking**: Dashboard shows sync status and last sync time
 
 ### Multi-Device Workflow
 
@@ -359,21 +381,49 @@ gh repo clone your-username/your-notes-repo ~/notes
 ```
 
 The command automatically:
-1. Pulls any remote changes first
-2. Commits your local changes
-3. Pushes everything to GitHub
-4. Handles conflicts gracefully
+1. Tests connectivity to GitHub
+2. Pulls any remote changes first
+3. Commits your local changes with timestamps
+4. Pushes everything to GitHub
+5. Reloads any changed buffers
+6. Updates sync status in dashboard
 
-## 🎨 Syntax Highlighting
+## 🎨 Enhanced Syntax Highlighting
 
-The plugin provides enhanced syntax highlighting for notes:
+The plugin provides a custom `notes` filetype with enhanced syntax highlighting:
 
-- **Tags**: Highlighted with `#tag` syntax and `Tags:` lines
-- **Dates/Times**: Special highlighting for timestamps
-- **Task Lists**: Enhanced checkbox highlighting
-- **Callouts**: Support for `[!INFO]`, `[!NOTE]`, `[!WARNING]` etc.
-- **Wiki Links**: `[[Internal Links]]` highlighting
-- **Highlights**: `==highlighted text==` support
+### Features
+
+- **Tags**: Highlighted `#hashtag` syntax and `Tags:` lines
+- **Dates/Times**: Special highlighting for timestamps (`2024-01-15`, `14:30`)
+- **Task Lists**: Enhanced checkbox highlighting (`- [ ]`, `- [x]`)
+- **Priorities**: Priority markers (`!!`, `!!!`) with different colors
+- **Pin Indicators**: Special highlighting for 📌 pin markers
+- **Sections**: Enhanced header highlighting (`##`, `###`)
+- **Created/Modified Lines**: Special highlighting for metadata lines
+- **Markdown Base**: Built on top of standard markdown syntax
+
+### Syntax Examples
+
+```markdown
+# Project Meeting Notes
+
+Created: 2024-01-15 14:30
+Tags: work project urgent
+
+## Action Items
+
+- [ ] Review budget proposal !!!
+- [x] Send meeting notes !!
+- [ ] Schedule follow-up #next-week
+
+## Discussion Points
+
+We covered #project-alpha and #budget-planning.
+The #urgent items need attention by #deadline-friday.
+
+📌 This note is pinned for quick access.
+```
 
 ## 👀 Markdown Preview
 
@@ -392,31 +442,35 @@ cargo install mdcat
 
 # Alternative: bat with syntax highlighting
 brew install bat
-
-# For browser preview and export
-pip install grip
-npm install -g @shd101wyy/markdown-preview-enhanced
 ```
 
 ### Preview Options
 
-- **Terminal Preview**: `:NotesPreview` (uses glow/mdcat/bat)
-- **Browser Preview**: Available through the preview module
-- **Floating Window**: Quick preview in a floating window
-- **Live Preview**: Auto-refreshing preview on file changes
-- **Export**: Export to HTML/PDF using pandoc
+- **Terminal Preview**: `:NotesPreview` (uses glow/mdcat/bat/cat)
+- **Auto-detection**: Plugin automatically detects available preview tools
+- **Fallback**: Uses `cat` if no other tools are available
+
+The preview command is automatically detected in this order:
+1. `glow -p` (best GitHub-flavored markdown rendering)
+2. `mdcat` (good terminal markdown rendering)
+3. `bat --language=markdown` (syntax highlighted text)
+4. `cat` (plain text fallback)
 
 ## 🔧 Advanced Configuration
 
 ### UI Customization
 
-The plugin uses [nui.nvim](https://github.com/MunifTanjim/nui.nvim) for beautiful UI components. All menus and inputs are styled with rounded borders and intuitive navigation.
+The plugin uses [nui.nvim](https://github.com/MunifTanjim/nui.nvim) for beautiful UI components. All menus and popups feature:
+- Rounded borders
+- Proper focus management
+- Intuitive navigation
+- Auto-sizing based on content
 
 ### Auto-save Configuration
 
 ```lua
 require('nvim-notes').setup({
-  auto_save = true,  -- Enable auto-save
+  auto_save = true,  -- Enable auto-save on buffer leave/focus lost
 })
 ```
 
@@ -431,6 +485,14 @@ require('nvim-notes').setup({
 :NotesSetVault ~/Documents/MyNotes
 ```
 
+### Disable Default Keybindings
+
+```lua
+require('nvim-notes').setup({
+  disable_default_keybindings = true,
+})
+```
+
 ## 🎯 Tips and Tricks
 
 ### 1. Daily Notes Workflow
@@ -440,7 +502,7 @@ Create a daily note with:
 :NotesNew
 ```
 
-This automatically creates a note named with today's date.
+Press Enter to use today's date-time, or type a custom name.
 
 ### 2. Project-Based Organization
 
@@ -467,12 +529,19 @@ Tags: personal idea creative
 Tags: learning vim neovim
 ```
 
-### 4. Link Between Notes
+### 4. Pin Management
 
-Use wiki-style links to connect notes:
-```markdown
-This relates to [[Meeting Notes]] and [[Project Alpha]].
-```
+- Pin your most frequently accessed notes
+- Pinned notes appear first in all search results
+- Use the dashboard to see all pinned notes at a glance
+- Toggle pin status with `:NotesPinToggle` or `<leader><tab>p`
+
+### 5. Search Workflow
+
+- Use `:NotesSearch` without arguments to browse all notes
+- Pinned notes always appear first
+- Search results show creation dates and tag indicators
+- Use `:NotesSearchTags` for tag-specific searches
 
 ## 🐛 Troubleshooting
 
@@ -493,16 +562,23 @@ The plugin requires [nui.nvim](https://github.com/MunifTanjim/nui.nvim) for its 
 1. Ensure the vault directory exists and is writable
 2. Check the vault path: `:lua print(require('nvim-notes.config').get_vault_path())`
 
+### GitHub Sync Issues
+
+1. Ensure GitHub CLI is installed and authenticated: `gh auth status`
+2. Configure git authentication: `gh auth setup-git`
+3. Check connectivity: The plugin tests GitHub connectivity before syncing
+4. For hanging issues, ensure git credentials are properly configured
+
+### Search Not Working
+
+1. Ensure your vault directory contains `.md` files
+2. Check that files are readable
+3. Verify vault path is correct
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📄 License
 
-MIT License - see LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-- Inspired by Obsidian and other note-taking applications
-- Built for the Neovim ecosystem
-- Uses [nui.nvim](https://github.com/MunifTanjim/nui.nvim) for beautiful UI components 
+MIT License 
