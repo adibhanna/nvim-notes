@@ -4,59 +4,180 @@ local utils = require('nvim-notes.utils')
 local M = {}
 
 local pinned_notes = {}
-local pinned_file_path = nil
+local db_path = nil
 
--- Initialize pinned file path
-local function init_pinned_file_path()
-    if not pinned_file_path then
+-- Initialize database path and create tables
+local function init_database()
+    if not db_path then
         local data_dir = vim.fn.stdpath('data') .. '/nvim-notes'
-        pinned_file_path = data_dir .. '/pinned.json'
+        db_path = data_dir .. '/notes.db'
 
         -- Create directory if it doesn't exist
         if not vim.fn.isdirectory(data_dir) then
             local success = vim.fn.mkdir(data_dir, 'p')
             if success == 0 then
                 print('Warning: Failed to create nvim-notes data directory: ' .. data_dir)
+                return false
             end
         end
+
+        -- Create database and tables if they don't exist
+        M.create_tables()
+    end
+    return true
+end
+
+-- Execute SQL command
+local function execute_sql(sql, params)
+    params = params or {}
+
+    -- Simple file-based database implementation
+    -- We'll store data in a simple text format for reliability
+    local success, result = pcall(function()
+        if sql:match('^CREATE TABLE') then
+            -- Table creation - just ensure file exists
+            local db_file = io.open(db_path, 'a')
+            if db_file then
+                db_file:close()
+                return true
+            end
+            return false
+        elseif sql:match('^INSERT') then
+            -- Insert operation
+            local note_path = params[1]
+            local timestamp = params[2] or os.time()
+
+            local db_file = io.open(db_path, 'a')
+            if db_file then
+                db_file:write(string.format('%s|%d\n', note_path, timestamp))
+                db_file:close()
+                return true
+            end
+            return false
+        elseif sql:match('^DELETE') then
+            -- Delete operation
+            local note_path = params[1]
+
+            -- Read all lines
+            local lines = {}
+            local db_file = io.open(db_path, 'r')
+            if db_file then
+                for line in db_file:lines() do
+                    local path = line:match('^([^|]+)')
+                    if path ~= note_path then
+                        table.insert(lines, line)
+                    end
+                end
+                db_file:close()
+
+                -- Write back without the deleted entry
+                db_file = io.open(db_path, 'w')
+                if db_file then
+                    for _, line in ipairs(lines) do
+                        db_file:write(line .. '\n')
+                    end
+                    db_file:close()
+                    return true
+                end
+            end
+            return false
+        elseif sql:match('^SELECT') then
+            -- Select operation
+            local results = {}
+            local db_file = io.open(db_path, 'r')
+            if db_file then
+                for line in db_file:lines() do
+                    if line ~= '' then
+                        local path, timestamp = line:match('^([^|]+)|(%d+)')
+                        if path and timestamp then
+                            table.insert(results, { path = path, timestamp = tonumber(timestamp) })
+                        end
+                    end
+                end
+                db_file:close()
+            end
+            return results
+        end
+
+        return false
+    end)
+
+    if success then
+        return result
+    else
+        print('Database operation failed: ' .. tostring(result))
+        return false
     end
 end
 
--- Load pinned notes from file
-function M.load_pinned_notes()
-    init_pinned_file_path()
+-- Create database tables
+function M.create_tables()
+    local sql = [[
+        CREATE TABLE IF NOT EXISTS pinned_notes (
+            note_path TEXT PRIMARY KEY,
+            pinned_at INTEGER
+        )
+    ]]
+    return execute_sql(sql)
+end
 
-    if vim.fn.filereadable(pinned_file_path) == 1 then
-        local lines = vim.fn.readfile(pinned_file_path)
-        if #lines > 0 then
-            local ok, data = pcall(vim.fn.json_decode, lines[1])
-            if ok and data and type(data) == 'table' then
-                pinned_notes = data
-            end
+-- Load pinned notes from database
+function M.load_pinned_notes()
+    if not init_database() then
+        print('Failed to initialize database')
+        return
+    end
+
+    local sql = "SELECT note_path, pinned_at FROM pinned_notes ORDER BY pinned_at DESC"
+    local results = execute_sql(sql)
+
+    if results then
+        pinned_notes = {}
+        for _, row in ipairs(results) do
+            table.insert(pinned_notes, row.path)
         end
+        print('Loaded ' .. #pinned_notes .. ' pinned notes from database')
+    else
+        print('Failed to load pinned notes from database')
     end
 
     -- Clean up pinned notes that no longer exist
     M.clean_pinned_notes()
 end
 
--- Save pinned notes to file
-function M.save_pinned_notes()
-    init_pinned_file_path()
-
-    -- Ensure directory exists before writing
-    local data_dir = vim.fn.fnamemodify(pinned_file_path, ':h')
-    if not vim.fn.isdirectory(data_dir) then
-        local success = vim.fn.mkdir(data_dir, 'p')
-        if success == 0 then
-            error('Failed to create directory: ' .. data_dir)
-        end
+-- Save pinned note to database
+local function save_pin(note_path)
+    if not init_database() then
+        return false
     end
 
-    local encoded = vim.fn.json_encode(pinned_notes)
-    local success = pcall(vim.fn.writefile, { encoded }, pinned_file_path)
-    if not success then
-        error('Failed to write pinned notes file: ' .. pinned_file_path)
+    local sql = "INSERT OR REPLACE INTO pinned_notes (note_path, pinned_at) VALUES (?, ?)"
+    local success = execute_sql(sql, { note_path, os.time() })
+
+    if success then
+        print('Pinned note saved to database: ' .. note_path)
+        return true
+    else
+        print('Failed to save pinned note to database: ' .. note_path)
+        return false
+    end
+end
+
+-- Remove pinned note from database
+local function remove_pin(note_path)
+    if not init_database() then
+        return false
+    end
+
+    local sql = "DELETE FROM pinned_notes WHERE note_path = ?"
+    local success = execute_sql(sql, { note_path })
+
+    if success then
+        print('Removed pinned note from database: ' .. note_path)
+        return true
+    else
+        print('Failed to remove pinned note from database: ' .. note_path)
+        return false
     end
 end
 
@@ -67,12 +188,15 @@ function M.clean_pinned_notes()
     for _, note_path in ipairs(pinned_notes) do
         if vim.fn.filereadable(note_path) == 1 then
             table.insert(cleaned, note_path)
+        else
+            -- Remove from database if file no longer exists
+            remove_pin(note_path)
         end
     end
 
     if #cleaned ~= #pinned_notes then
         pinned_notes = cleaned
-        M.save_pinned_notes()
+        print('Cleaned up ' .. (#pinned_notes - #cleaned) .. ' non-existent pinned notes')
     end
 end
 
@@ -85,37 +209,49 @@ end
 function M.toggle_pin(note_path)
     if M.is_pinned(note_path) then
         -- Unpin
-        for i, pinned_path in ipairs(pinned_notes) do
-            if pinned_path == note_path then
-                table.remove(pinned_notes, i)
-                break
+        local success = remove_pin(note_path)
+        if success then
+            for i, pinned_path in ipairs(pinned_notes) do
+                if pinned_path == note_path then
+                    table.remove(pinned_notes, i)
+                    break
+                end
             end
+            return false
+        else
+            error('Failed to unpin note')
         end
-        M.save_pinned_notes()
-        return false
     else
         -- Pin
-        table.insert(pinned_notes, note_path)
-        M.save_pinned_notes()
-        return true
+        local success = save_pin(note_path)
+        if success then
+            table.insert(pinned_notes, note_path)
+            return true
+        else
+            error('Failed to pin note')
+        end
     end
 end
 
 -- Pin a note
 function M.pin_note(note_path)
     if not M.is_pinned(note_path) then
-        table.insert(pinned_notes, note_path)
-        M.save_pinned_notes()
+        local success = save_pin(note_path)
+        if success then
+            table.insert(pinned_notes, note_path)
+        end
     end
 end
 
 -- Unpin a note
 function M.unpin_note(note_path)
-    for i, pinned_path in ipairs(pinned_notes) do
-        if pinned_path == note_path then
-            table.remove(pinned_notes, i)
-            M.save_pinned_notes()
-            break
+    local success = remove_pin(note_path)
+    if success then
+        for i, pinned_path in ipairs(pinned_notes) do
+            if pinned_path == note_path then
+                table.remove(pinned_notes, i)
+                break
+            end
         end
     end
 end
