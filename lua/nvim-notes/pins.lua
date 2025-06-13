@@ -47,13 +47,30 @@ local function execute_sql(sql, params)
             local note_path = params[1]
             local timestamp = params[2] or os.time()
 
+            print('DEBUG: INSERT operation - note_path: ' ..
+                tostring(note_path) .. ', timestamp: ' .. tostring(timestamp))
+            print('DEBUG: Attempting to open file for append: ' .. db_path)
+
             local db_file = io.open(db_path, 'a')
             if db_file then
-                db_file:write(string.format('%s|%d\n', note_path, timestamp))
+                print('DEBUG: File opened successfully, writing data')
+                local line = string.format('%s|%d\n', note_path, timestamp)
+                print('DEBUG: Writing line: ' .. line:sub(1, -2)) -- Remove trailing newline for display
+
+                local write_success = db_file:write(line)
                 db_file:close()
-                return true
+
+                if write_success then
+                    print('DEBUG: Write successful')
+                    return true
+                else
+                    print('DEBUG: Write failed')
+                    return false
+                end
+            else
+                print('DEBUG: Failed to open file for writing: ' .. db_path)
+                return false
             end
-            return false
         elseif sql:match('^DELETE') then
             -- Delete operation
             local note_path = params[1]
@@ -147,12 +164,20 @@ end
 
 -- Save pinned note to database
 local function save_pin(note_path)
+    print('DEBUG: Attempting to save pin for: ' .. note_path)
+
     if not init_database() then
+        print('DEBUG: Database initialization failed')
         return false
     end
 
+    print('DEBUG: Database initialized, db_path: ' .. tostring(db_path))
+
     local sql = "INSERT OR REPLACE INTO pinned_notes (note_path, pinned_at) VALUES (?, ?)"
-    local success = execute_sql(sql, { note_path, os.time() })
+    local timestamp = os.time()
+    print('DEBUG: Executing SQL with params: ' .. note_path .. ', ' .. timestamp)
+
+    local success = execute_sql(sql, { note_path, timestamp })
 
     if success then
         print('Pinned note saved to database: ' .. note_path)
