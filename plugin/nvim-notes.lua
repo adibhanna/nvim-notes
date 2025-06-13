@@ -45,7 +45,7 @@ local function set_keybindings()
 
     if has_whichkey then
         wk.register({
-            n = {
+            [','] = {
                 name = "Notes",
                 n = { notes.new_note, "Create new note" },
                 s = { notes.search_notes, "Search notes content" },
