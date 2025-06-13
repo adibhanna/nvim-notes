@@ -11,9 +11,7 @@ local default_config = {
     enable_concealing = true,
     conceal_level = 2,
     disable_default_keybindings = false,
-    max_recent_notes = 10,
-    spell_check = true,   -- Enable spell checking by default
-    spell_lang = 'en_us', -- Use English if spell checking is enabled
+    max_recent_notes = 10
 }
 
 local config = {}
@@ -112,19 +110,6 @@ function M.load_config()
                 end
             end
         end
-    end
-end
-
--- Apply spell checking settings for notes
-function M.setup_spell_checking()
-    local spell_config = config.spell_check
-    local spell_lang = config.spell_lang or 'en_us'
-
-    if spell_config then
-        vim.opt_local.spell = true
-        vim.opt_local.spelllang = spell_lang
-    else
-        vim.opt_local.spell = false
     end
 end
 

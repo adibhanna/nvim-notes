@@ -2,13 +2,6 @@ if exists('b:current_syntax')
   finish
 endif
 
-" Prevent German spell check warnings aggressively
-setlocal spelllang=en_us
-setlocal nospell
-" Disable spell file loading to prevent any language file warnings
-let b:did_ftplugin = 1
-let g:loaded_spellfile_plugin = 1
-
 " Load base markdown syntax
 runtime! syntax/markdown.vim
 

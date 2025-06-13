@@ -9,27 +9,40 @@ local M = {}
 
 -- Setup function
 function M.setup(user_config)
-    -- Prevent German spell check warnings globally and aggressively
-    vim.opt.spelllang = 'en_us'
-    vim.opt.spell = false
-
-    -- Also set it as a fallback in case other plugins override
-    vim.cmd('set spelllang=en_us')
-    vim.cmd('set nospell')
-
-    -- Disable spell checking completely to prevent any language loading
-    vim.g.loaded_spellfile_plugin = 1
-
     config.setup(user_config or {})
 
-    -- Ensure vault directory exists
     local vault_path = config.get_vault_path()
+
+    -- Ensure vault directory exists
     if not vim.fn.isdirectory(vault_path) then
         vim.fn.mkdir(vault_path, 'p')
     end
 
     -- Load pinned notes
     pins.load_pinned_notes()
+
+    -- Create autocommands
+    vim.api.nvim_create_augroup('NvimNotes', { clear = true })
+
+    -- Auto-save notes when leaving buffer
+    vim.api.nvim_create_autocmd({ 'BufLeave', 'FocusLost' }, {
+        group = 'NvimNotes',
+        pattern = vault_path .. '/*.md',
+        callback = function()
+            if vim.bo.modified then
+                vim.cmd('silent! write')
+            end
+        end,
+    })
+
+    -- Set filetype for notes
+    vim.api.nvim_create_autocmd({ 'BufRead', 'BufNewFile' }, {
+        group = 'NvimNotes',
+        pattern = vault_path .. '/*.md',
+        callback = function()
+            vim.bo.filetype = 'notes'
+        end,
+    })
 
     -- Set up autocmds for markdown files in vault
     vim.api.nvim_create_autocmd('BufRead', {
@@ -55,60 +68,8 @@ function M.setup(user_config)
         })
     end
 
-    -- Set up spell checking for notes
-    vim.api.nvim_create_augroup('NvimNotesSpell', { clear = true })
-    vim.api.nvim_create_autocmd({ 'BufRead', 'BufNewFile' }, {
-        group = 'NvimNotesSpell',
-        pattern = '*.md',
-        callback = function()
-            local file_path = vim.fn.expand('%:p')
-            if file_path:find(config.get_vault_path(), 1, true) then
-                config.setup_spell_checking()
-                -- Force spell settings to prevent German warnings
-                vim.opt_local.spelllang = 'en_us'
-                vim.opt_local.spell = false
-            end
-        end
-    })
-
-    -- Additional autocommand to catch any spell setting changes
-    vim.api.nvim_create_autocmd({ 'OptionSet' }, {
-        group = 'NvimNotesSpell',
-        pattern = 'spelllang',
-        callback = function()
-            -- Prevent German spell language globally, not just in notes
-            local current_spelllang = vim.opt.spelllang:get()
-            for _, lang in ipairs(current_spelllang) do
-                if lang:match('de') then
-                    vim.opt.spelllang = 'en_us'
-                    vim.opt.spell = false
-                    print('nvim-notes: Prevented German spell check, using English instead')
-                    break
-                end
-            end
-        end
-    })
-
-    -- Global autocommand to prevent German spell checking anywhere
-    vim.api.nvim_create_autocmd({ 'BufEnter', 'BufRead', 'BufNewFile' }, {
-        group = 'NvimNotesSpell',
-        pattern = '*',
-        callback = function()
-            local current_spelllang = vim.opt_local.spelllang:get()
-            for _, lang in ipairs(current_spelllang) do
-                if lang:match('de') then
-                    vim.opt_local.spelllang = 'en_us'
-                    vim.opt_local.spell = false
-                    break
-                end
-            end
-        end
-    })
-
-    -- Set up keybindings
-    if not user_config or user_config.disable_keybindings ~= true then
-        M.setup_keybindings()
-    end
+    -- Setup keybindings
+    M.setup_keybindings()
 end
 
 -- Set up keybindings with which-key if available
@@ -309,6 +270,47 @@ function M.preview_markdown()
     preview.preview_markdown(current_file)
 end
 
+-- Get sync status information
+local function get_sync_status()
+    local vault_path = config.get_vault_path()
+
+    -- Check if it's a git repository
+    if not vim.fn.isdirectory(vault_path .. '/.git') then
+        return {
+            is_git_repo = false,
+            status = 'Not a git repository'
+        }
+    end
+
+    local original_cwd = vim.fn.getcwd()
+    vim.cmd('cd ' .. vim.fn.fnameescape(vault_path))
+
+    -- Get last commit info
+    local last_commit = vim.fn.system('git log -1 --format="%cd" --date=relative 2>/dev/null'):gsub('\n', '')
+    if vim.v.shell_error ~= 0 then
+        last_commit = 'Unknown'
+    end
+
+    -- Check if there are uncommitted changes
+    local status_output = vim.fn.system('git status --porcelain 2>/dev/null')
+    local has_changes = status_output ~= '' and vim.v.shell_error == 0
+
+    -- Check if remote is ahead
+    local remote_status = vim.fn.system('git status -uno --porcelain=v1 2>/dev/null')
+    local remote_ahead = remote_status:match('ahead') ~= nil
+    local remote_behind = remote_status:match('behind') ~= nil
+
+    vim.cmd('cd ' .. vim.fn.fnameescape(original_cwd))
+
+    return {
+        is_git_repo = true,
+        last_sync = last_commit,
+        has_local_changes = has_changes,
+        remote_ahead = remote_ahead,
+        remote_behind = remote_behind
+    }
+end
+
 -- Show notes index/dashboard
 function M.show_index()
     local vault_path = config.get_vault_path()
@@ -316,16 +318,16 @@ function M.show_index()
     local pinned_notes = pins.get_pinned_notes()
     local recent_notes = utils.get_recent_notes(5)
     local all_tags = tags.get_all_tags()
+    local sync_status = get_sync_status()
 
     local Popup = require('nui.popup')
     local event = require('nui.utils.autocmd').event
 
-    -- Calculate dynamic height based on content
-    local content_lines = 8 -- Base lines (header + stats + separators)
+    -- Calculate dynamic height based on content (removed quick actions section)
+    local content_lines = 10 -- Base lines (header + stats + sync + separators)
     content_lines = content_lines + math.min(#pinned_notes, 5) + (pinned_notes and #pinned_notes > 0 and 2 or 0)
     content_lines = content_lines + math.min(#recent_notes, 5) + 2
     content_lines = content_lines + math.min(#all_tags, 8) + (all_tags and #all_tags > 0 and 2 or 0)
-    content_lines = content_lines + 9 -- Shortcuts section
 
     local height = math.min(content_lines + 4, math.floor(vim.o.lines * 0.8))
     local width = math.min(80, math.floor(vim.o.columns * 0.8))
@@ -361,6 +363,32 @@ function M.show_index()
     table.insert(lines, '📄 **Total Notes:** `' .. #notes .. '`')
     table.insert(lines, '📌 **Pinned Notes:** `' .. #pinned_notes .. '`')
     table.insert(lines, '🏷️  **Tags:** `' .. #all_tags .. '`')
+
+    -- Sync status section
+    table.insert(lines, '')
+    if sync_status.is_git_repo then
+        table.insert(lines, '🔄 **Last Synced:** `' .. sync_status.last_sync .. '`')
+
+        local status_indicators = {}
+        if sync_status.has_local_changes then
+            table.insert(status_indicators, '📝 Local changes')
+        end
+        if sync_status.remote_behind then
+            table.insert(status_indicators, '📥 Remote updates available')
+        end
+        if sync_status.remote_ahead then
+            table.insert(status_indicators, '📤 Local commits to push')
+        end
+
+        if #status_indicators > 0 then
+            table.insert(lines, '⚠️  **Status:** `' .. table.concat(status_indicators, ', ') .. '`')
+        else
+            table.insert(lines, '✅ **Status:** `Up to date`')
+        end
+    else
+        table.insert(lines, '🔄 **Sync:** `Not configured (run :NotesSync to setup)`')
+    end
+
     table.insert(lines, '')
     table.insert(lines, '─────────────────────────────────────────────────────')
     table.insert(lines, '')
@@ -410,66 +438,27 @@ function M.show_index()
         table.insert(lines, '')
     end
 
-    -- Shortcuts section
+    -- Footer
     table.insert(lines, '─────────────────────────────────────────────────────')
     table.insert(lines, '')
-    table.insert(lines, '### ⚡ Quick Actions')
-    table.insert(lines, '')
-    table.insert(lines, '  `<tab>n` New Note    `<tab>s` Search    `<tab>t` Tags')
-    table.insert(lines, '  `<tab>p` Pin Toggle  `<tab>d` Delete    `<tab>v` Preview')
-    table.insert(lines, '  `<tab>S` Sync')
-    table.insert(lines, '')
-    table.insert(lines, '_Press ESC to close, ? for help_')
+    table.insert(lines, '_Press ESC or q to close_')
 
     -- Set content
     vim.api.nvim_buf_set_lines(popup.bufnr, 0, -1, false, lines)
 
-    -- Mount the popup
+    -- Mount the popup and ensure focus
     popup:mount()
 
-    -- Set up keybindings
+    -- Ensure the popup window has focus
+    vim.api.nvim_set_current_win(popup.winid)
+
+    -- Set up keybindings (only close actions now)
     local function close_popup()
         popup:unmount()
     end
 
-    -- Quick action keybindings
     popup:map('n', '<Esc>', close_popup, { noremap = true })
     popup:map('n', 'q', close_popup, { noremap = true })
-    popup:map('n', 'n', function()
-        close_popup()
-        M.new_note()
-    end, { noremap = true })
-    popup:map('n', 's', function()
-        close_popup()
-        M.search_notes()
-    end, { noremap = true })
-    popup:map('n', 't', function()
-        close_popup()
-        M.search_by_tags()
-    end, { noremap = true })
-    popup:map('n', 'd', function()
-        close_popup()
-        M.delete_note()
-    end, { noremap = true })
-    popup:map('n', 'v', function()
-        close_popup()
-        M.preview_markdown()
-    end, { noremap = true })
-    popup:map('n', 'S', function()
-        close_popup()
-        M.sync()
-    end, { noremap = true })
-
-    popup:map('n', '?', function()
-        vim.notify('Dashboard Help:\n\n' ..
-            'n - New note\n' ..
-            's - Search notes (pinned shown first)\n' ..
-            't - Search by tags\n' ..
-            'd - Delete current note\n' ..
-            'v - Preview current note\n' ..
-            'S - Sync notes with GitHub\n' ..
-            'q/ESC - Close dashboard', vim.log.levels.INFO)
-    end, { noremap = true })
 
     -- Auto-close on buffer leave
     popup:on(event.BufLeave, function()
