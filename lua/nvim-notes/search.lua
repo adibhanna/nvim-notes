@@ -376,7 +376,7 @@ function M.show_notes_for_tag(tag, tag_notes)
     end
 end
 
--- Search pinned notes using FZF
+-- Search pinned notes
 function M.search_pinned_notes()
     local pins = require('nvim-notes.pins')
     local pinned_notes = pins.get_pinned_notes()
@@ -386,14 +386,8 @@ function M.search_pinned_notes()
         return
     end
 
-    -- Check if fzf is available
-    if vim.fn.executable('fzf') == 0 then
-        print('FZF not found. Please install fzf: https://github.com/junegunn/fzf')
-        return
-    end
-
-    -- Format notes for FZF display
-    local fzf_lines = {}
+    -- Format notes for display
+    local options = {}
     local note_map = {}
 
     for _, note in ipairs(pinned_notes) do
@@ -402,36 +396,20 @@ function M.search_pinned_notes()
             note.modified,
             note.relative_path
         )
-        table.insert(fzf_lines, display_line)
+        table.insert(options, display_line)
         note_map[display_line] = note
     end
 
-    -- FZF options
-    local fzf_opts = {
-        source = fzf_lines,
-        sink = function(selected)
-            if selected and note_map[selected] then
-                vim.cmd('edit ' .. note_map[selected].path)
-            end
+    vim.ui.select(options, {
+        prompt = '📌 Pinned Notes (' .. #pinned_notes .. ' total): ',
+        format_item = function(item)
+            return item
         end,
-        options = {
-            '--prompt=📌 Pinned Notes: ',
-            '--height=60%',
-            '--layout=reverse',
-            '--border',
-            '--info=inline',
-            '--preview=bat --style=numbers --color=always --line-range=:50 {}',
-            '--preview-window=right:50%:wrap',
-            '--bind=ctrl-/:toggle-preview',
-            '--header=Pinned Notes (' .. #pinned_notes .. ' total)',
-        }
-    }
-
-    if vim.fn.exists('*fzf#run') == 1 then
-        vim.fn['fzf#run'](fzf_opts)
-    else
-        print('FZF vim plugin not available')
-    end
+    }, function(choice)
+        if choice and note_map[choice] then
+            vim.cmd('edit ' .. note_map[choice].path)
+        end
+    end)
 end
 
 return M
