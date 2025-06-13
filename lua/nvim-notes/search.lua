@@ -198,14 +198,53 @@ end
 
 -- Interactive search with live results
 function M.interactive_search()
+    local Layout = require('nui.layout')
     local Input = require('nui.input')
+    local Menu = require('nui.menu')
     local event = require('nui.utils.autocmd').event
 
+    local notes = utils.get_all_notes()
+    if #notes == 0 then
+        print('No notes found in vault')
+        return
+    end
+
+    local filtered_notes = notes
+    local menu_items = {}
+
+    -- Function to update menu items based on search
+    local function update_menu_items(search_query)
+        menu_items = {}
+        filtered_notes = {}
+
+        if not search_query or search_query == '' then
+            filtered_notes = notes
+        else
+            local query_lower = search_query:lower()
+            for _, note in ipairs(notes) do
+                -- Search in title and content
+                local title_match = note.title:lower():find(query_lower, 1, true)
+                local content_matches = utils.search_file_content(note.path, search_query)
+
+                if title_match or #content_matches > 0 then
+                    table.insert(filtered_notes, note)
+                end
+            end
+        end
+
+        for i, note in ipairs(filtered_notes) do
+            local display_text = string.format('%d. %s (%s)', i, note.title, note.modified)
+            table.insert(menu_items, Menu.item(display_text, { note = note }))
+        end
+
+        return menu_items
+    end
+
+    -- Create initial menu items
+    update_menu_items('')
+
+    -- Create input component
     local input = Input({
-        position = '50%',
-        size = {
-            width = 50,
-        },
         border = {
             style = 'rounded',
             text = {
@@ -219,22 +258,153 @@ function M.interactive_search()
     }, {
         prompt = '> ',
         default_value = '',
-        on_close = function()
-            -- Input closed
-        end,
+        on_close = function() end,
         on_submit = function(value)
-            if value and value ~= '' then
-                M.search_all(value)
+            -- Enter pressed in search box - open first result if available
+            if #filtered_notes > 0 then
+                vim.cmd('edit ' .. filtered_notes[1].path)
             end
         end,
     })
 
-    input:mount()
+    -- Create menu component
+    local menu = Menu({
+        border = {
+            style = 'rounded',
+            text = {
+                top = '[📝 Notes (' .. #notes .. ' total)]',
+                top_align = 'center',
+            },
+        },
+        win_options = {
+            winhighlight = 'Normal:Normal,FloatBorder:Normal',
+        },
+    }, {
+        lines = menu_items,
+        max_width = 80,
+        keymap = {
+            focus_next = { 'j', '<Down>', '<Tab>' },
+            focus_prev = { 'k', '<Up>', '<S-Tab>' },
+            close = { '<Esc>', '<C-c>' },
+            submit = { '<CR>', '<Space>' },
+        },
+        on_close = function() end,
+        on_submit = function(item)
+            if item.note then
+                vim.cmd('edit ' .. item.note.path)
+            end
+        end,
+    })
 
-    -- unmount component when cursor leaves buffer
-    input:on(event.BufLeave, function()
-        input:unmount()
+    -- Create layout
+    local layout = Layout(
+        {
+            position = '50%',
+            size = {
+                width = math.min(100, vim.o.columns - 4),
+                height = math.min(30, vim.o.lines - 4),
+            },
+        },
+        Layout.Box({
+            Layout.Box(input, { size = 3 }),
+            Layout.Box(menu, { size = '100%' }),
+        }, { dir = 'col' })
+    )
+
+    -- Set up live search
+    local search_timer = nil
+    input:on(event.TextChangedI, function()
+        if search_timer then
+            vim.fn.timer_stop(search_timer)
+        end
+
+        search_timer = vim.fn.timer_start(150, function()
+            local current_value = vim.api.nvim_buf_get_lines(input.bufnr, 0, 1, false)[1]
+            if current_value then
+                -- Remove the prompt from the value
+                local search_query = current_value:gsub('^> ', '')
+                update_menu_items(search_query)
+
+                -- Update menu
+                menu:unmount()
+                menu = Menu({
+                    border = {
+                        style = 'rounded',
+                        text = {
+                            top = '[📝 ' ..
+                                (#filtered_notes > 0 and filtered_notes[1].title or 'No matches') ..
+                                ' (' .. #filtered_notes .. '/' .. #notes .. ')]',
+                            top_align = 'center',
+                        },
+                    },
+                    win_options = {
+                        winhighlight = 'Normal:Normal,FloatBorder:Normal',
+                    },
+                }, {
+                    lines = menu_items,
+                    max_width = 80,
+                    keymap = {
+                        focus_next = { 'j', '<Down>', '<Tab>' },
+                        focus_prev = { 'k', '<Up>', '<S-Tab>' },
+                        close = { '<Esc>', '<C-c>' },
+                        submit = { '<CR>', '<Space>' },
+                    },
+                    on_close = function() end,
+                    on_submit = function(item)
+                        if item.note then
+                            layout:unmount()
+                            vim.cmd('edit ' .. item.note.path)
+                        end
+                    end,
+                })
+
+                -- Update layout
+                layout:update(Layout.Box({
+                    Layout.Box(input, { size = 3 }),
+                    Layout.Box(menu, { size = '100%' }),
+                }, { dir = 'col' }))
+            end
+        end)
     end)
+
+    -- Key mappings for navigation between input and menu
+    input:map('n', '<Tab>', function()
+        vim.api.nvim_set_current_win(menu.winid)
+    end, { noremap = true })
+
+    input:map('i', '<Tab>', function()
+        vim.api.nvim_set_current_win(menu.winid)
+    end, { noremap = true })
+
+    menu:map('n', '<S-Tab>', function()
+        vim.api.nvim_set_current_win(input.winid)
+        vim.cmd('startinsert!')
+    end, { noremap = true })
+
+    -- Close all on escape
+    input:map('n', '<Esc>', function()
+        layout:unmount()
+    end, { noremap = true })
+
+    input:map('i', '<Esc>', function()
+        layout:unmount()
+    end, { noremap = true })
+
+    menu:map('n', '<Esc>', function()
+        layout:unmount()
+    end, { noremap = true })
+
+    -- Mount the layout
+    layout:mount()
+
+    -- Focus input and enter insert mode
+    vim.api.nvim_set_current_win(input.winid)
+    vim.cmd('startinsert!')
+end
+
+-- Live note finder - shows all notes with live filtering
+function M.live_note_finder()
+    return M.interactive_search()
 end
 
 return M

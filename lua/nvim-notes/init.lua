@@ -111,59 +111,19 @@ function M.open_note()
         return
     end
 
-    local Menu = require('nui.menu')
-    local event = require('nui.utils.autocmd').event
-
-    local menu_items = {}
-    for _, note in ipairs(notes) do
-        table.insert(menu_items, Menu.item(note.title .. ' (' .. note.modified .. ')', { note = note }))
-    end
-
-    local menu = Menu({
-        position = '50%',
-        size = {
-            width = math.min(80, vim.o.columns - 4),
-            height = math.min(20, #menu_items + 2),
-        },
-        border = {
-            style = 'rounded',
-            text = {
-                top = '[📝 Select Note]',
-                top_align = 'center',
-            },
-        },
-        win_options = {
-            winhighlight = 'Normal:Normal,FloatBorder:Normal',
-        },
-    }, {
-        lines = menu_items,
-        max_width = 70,
-        keymap = {
-            focus_next = { 'j', '<Down>', '<Tab>' },
-            focus_prev = { 'k', '<Up>', '<S-Tab>' },
-            close = { '<Esc>', '<C-c>' },
-            submit = { '<CR>', '<Space>' },
-        },
-        on_close = function()
-            -- Menu closed
-        end,
-        on_submit = function(item)
-            if item.note then
-                vim.cmd('edit ' .. item.note.path)
-            end
-        end,
-    })
-
-    menu:mount()
+    -- Use the interactive search interface
+    search.interactive_search()
 end
 
 -- Search notes by content
 function M.search_notes(query)
     if not query or query == '' then
+        -- If no query provided, show live search interface
         search.interactive_search()
         return
     end
 
+    -- If query provided, do traditional search
     search.search_all(query)
 end
 
