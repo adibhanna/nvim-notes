@@ -11,7 +11,6 @@ local function init_pins_file()
     if not pins_file_path then
         local vault_path = config.get_vault_path()
         pins_file_path = vault_path .. '/.nvim-notes-pins'
-        print('DEBUG: Pins file path: ' .. pins_file_path)
     end
     return true
 end
@@ -22,10 +21,8 @@ local function save_pins_to_file()
         return false
     end
 
-    print('DEBUG: Saving pins to file: ' .. pins_file_path)
     local file = io.open(pins_file_path, 'w')
     if not file then
-        print('ERROR: Could not open pins file for writing')
         return false
     end
 
@@ -33,7 +30,6 @@ local function save_pins_to_file()
         file:write(note_path .. '\n')
     end
     file:close()
-    print('DEBUG: Successfully saved ' .. #pinned_notes .. ' pins to file')
     return true
 end
 
@@ -44,11 +40,9 @@ local function load_pins_from_file()
     end
 
     pinned_notes = {}
-    print('DEBUG: Loading pins from file: ' .. pins_file_path)
 
     local file = io.open(pins_file_path, 'r')
     if not file then
-        print('DEBUG: Pins file does not exist yet, starting with empty list')
         return true
     end
 
@@ -60,7 +54,6 @@ local function load_pins_from_file()
     end
     file:close()
 
-    print('DEBUG: Loaded ' .. #pinned_notes .. ' pins from file')
     return true
 end
 
@@ -77,47 +70,27 @@ end
 
 -- Add note to pins
 local function save_pin(note_path)
-    print('DEBUG: Attempting to save pin for: ' .. note_path)
-
     -- Add to memory if not already there
     if not vim.tbl_contains(pinned_notes, note_path) then
         table.insert(pinned_notes, 1, note_path) -- Add to front
-        print('DEBUG: Added to pinned_notes list')
-    else
-        print('DEBUG: Note already in pinned list')
     end
 
     -- Save to file
-    if save_pins_to_file() then
-        print('Successfully pinned note: ' .. note_path)
-        return true
-    else
-        print('Failed to save pins to file: ' .. note_path)
-        return false
-    end
+    return save_pins_to_file()
 end
 
 -- Remove note from pins
 local function remove_pin(note_path)
-    print('DEBUG: Attempting to remove pin for: ' .. note_path)
-
     -- Remove from memory
     for i, pinned_path in ipairs(pinned_notes) do
         if pinned_path == note_path then
             table.remove(pinned_notes, i)
-            print('DEBUG: Removed from pinned_notes list')
             break
         end
     end
 
     -- Save to file
-    if save_pins_to_file() then
-        print('Successfully unpinned note: ' .. note_path)
-        return true
-    else
-        print('Failed to save pins to file: ' .. note_path)
-        return false
-    end
+    return save_pins_to_file()
 end
 
 -- Clean up pinned notes that no longer exist
@@ -146,29 +119,24 @@ end
 
 -- Toggle pin status of a note
 function M.toggle_pin(note_path)
-    print('DEBUG: Toggle pin called for: ' .. note_path)
-    print('DEBUG: Currently pinned: ' .. tostring(M.is_pinned(note_path)))
-
     if M.is_pinned(note_path) then
         -- Unpin
-        print('DEBUG: Attempting to unpin note')
         local success = remove_pin(note_path)
         if success then
-            print('Successfully unpinned: ' .. note_path)
+            print('Note unpinned')
             return false
         else
-            print('Failed to unpin note: ' .. note_path)
+            print('Failed to unpin note')
             return nil
         end
     else
         -- Pin
-        print('DEBUG: Attempting to pin note')
         local success = save_pin(note_path)
         if success then
-            print('Successfully pinned: ' .. note_path)
+            print('Note pinned')
             return true
         else
-            print('Failed to pin note: ' .. note_path)
+            print('Failed to pin note')
             return nil
         end
     end

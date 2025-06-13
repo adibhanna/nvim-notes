@@ -27,13 +27,13 @@ vim.api.nvim_create_user_command('NotesSearchTags', function(opts)
     notes.search_by_tags(opts.args)
 end, { nargs = '?', desc = 'Search notes by tags' })
 
-vim.api.nvim_create_user_command('NotesPin', function()
+vim.api.nvim_create_user_command('NotesPinToggle', function()
     notes.toggle_pin()
 end, { desc = 'Toggle pin status of current note' })
 
-vim.api.nvim_create_user_command('NotesPinned', function()
-    notes.show_pinned()
-end, { desc = 'Show all pinned notes' })
+vim.api.nvim_create_user_command('NotesPinSearch', function()
+    notes.search_pinned_notes()
+end, { desc = 'Search pinned notes' })
 
 vim.api.nvim_create_user_command('NotesPreview', function()
     notes.preview_markdown()
@@ -46,14 +46,18 @@ end, { desc = 'Show notes index/dashboard' })
 -- Default keybindings (can be overridden in user config)
 local function set_keybindings()
     local opts = { noremap = true, silent = true }
-    vim.keymap.set('n', '<leader>nn', notes.new_note, opts)
-    vim.keymap.set('n', '<leader>no', notes.open_note, opts)
-    vim.keymap.set('n', '<leader>ns', notes.search_notes, opts)
-    vim.keymap.set('n', '<leader>nt', notes.search_by_tags, opts)
-    vim.keymap.set('n', '<leader>np', notes.toggle_pin, opts)
-    vim.keymap.set('n', '<leader>nP', notes.show_pinned, opts)
-    vim.keymap.set('n', '<leader>nv', notes.preview_markdown, opts)
-    vim.keymap.set('n', '<leader>ni', notes.show_index, opts)
+    vim.keymap.set('n', '<leader>nn', notes.new_note, vim.tbl_extend('force', opts, { desc = 'Create new note' }))
+    vim.keymap.set('n', '<leader>no', notes.open_note, vim.tbl_extend('force', opts, { desc = 'Open/search notes' }))
+    vim.keymap.set('n', '<leader>ns', notes.search_notes,
+        vim.tbl_extend('force', opts, { desc = 'Search notes content' }))
+    vim.keymap.set('n', '<leader>nt', notes.search_by_tags, vim.tbl_extend('force', opts, { desc = 'Search by tags' }))
+    vim.keymap.set('n', '<leader>np', notes.toggle_pin,
+        vim.tbl_extend('force', opts, { desc = 'Toggle pin current note' }))
+    vim.keymap.set('n', '<leader>nP', notes.search_pinned_notes,
+        vim.tbl_extend('force', opts, { desc = 'Search pinned notes' }))
+    vim.keymap.set('n', '<leader>nv', notes.preview_markdown,
+        vim.tbl_extend('force', opts, { desc = 'Preview current note' }))
+    vim.keymap.set('n', '<leader>ni', notes.show_index, vim.tbl_extend('force', opts, { desc = 'Show notes dashboard' }))
 end
 
 -- Setup function to be called by user

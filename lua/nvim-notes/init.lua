@@ -148,9 +148,6 @@ function M.toggle_pin()
     local current_file = vim.fn.expand('%:p')
     local vault_path = config.get_vault_path()
 
-    print('DEBUG: Current file: ' .. current_file)
-    print('DEBUG: Vault path: ' .. vault_path)
-
     -- Check if current file is in vault
     if not current_file:find(vault_path, 1, true) then
         print('Current file is not in the notes vault')
@@ -162,14 +159,7 @@ function M.toggle_pin()
         return
     end
 
-    local result = pins.toggle_pin(current_file)
-    if result == true then
-        print('Note pinned')
-    elseif result == false then
-        print('Note unpinned')
-    else
-        print('Failed to toggle pin status')
-    end
+    pins.toggle_pin(current_file)
 end
 
 -- Show pinned notes using FZF
