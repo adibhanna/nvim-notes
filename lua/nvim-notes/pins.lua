@@ -32,6 +32,16 @@ local function init_database()
             print('DEBUG: Directory already exists')
         end
 
+        -- Double-check the directory exists after creation
+        local dir_exists = vim.fn.isdirectory(data_dir)
+        print('DEBUG: Directory exists check: ' .. tostring(dir_exists))
+
+        -- Check directory permissions
+        local dir_readable = vim.fn.filereadable(data_dir)
+        local dir_writable = vim.fn.filewritable(data_dir)
+        print('DEBUG: Directory readable: ' .. tostring(dir_readable))
+        print('DEBUG: Directory writable: ' .. tostring(dir_writable))
+
         -- Verify directory exists and is writable
         if not vim.fn.isdirectory(data_dir) then
             print('ERROR: Directory still does not exist after creation attempt')
