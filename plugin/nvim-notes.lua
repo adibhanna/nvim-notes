@@ -44,6 +44,23 @@ local function set_keybindings()
     local has_whichkey, wk = pcall(require, 'which-key')
 
     if has_whichkey then
+        -- Set the actual keybindings
+        local opts = { noremap = true, silent = true }
+        vim.keymap.set('n', '<leader>fnn', notes.new_note, vim.tbl_extend('force', opts, { desc = 'Create new note' }))
+        vim.keymap.set('n', '<leader>fns', notes.search_notes,
+            vim.tbl_extend('force', opts, { desc = 'Search notes content' }))
+        vim.keymap.set('n', '<leader>fnt', notes.search_by_tags,
+            vim.tbl_extend('force', opts, { desc = 'Search by tags' }))
+        vim.keymap.set('n', '<leader>fnp', notes.toggle_pin,
+            vim.tbl_extend('force', opts, { desc = 'Toggle pin current note' }))
+        vim.keymap.set('n', '<leader>fnP', notes.search_pinned_notes,
+            vim.tbl_extend('force', opts, { desc = 'Search pinned notes' }))
+        vim.keymap.set('n', '<leader>fnv', notes.preview_markdown,
+            vim.tbl_extend('force', opts, { desc = 'Preview current note' }))
+        vim.keymap.set('n', '<leader>fni', notes.show_index,
+            vim.tbl_extend('force', opts, { desc = 'Show notes dashboard' }))
+
+        -- Register with which-key
         wk.register({
             fn = {
                 name = "Notes",
