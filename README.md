@@ -14,7 +14,7 @@ A comprehensive note-taking plugin for Neovim with full markdown support, beauti
 - **✨ Beautiful UI**: Elegant dashboard and menus powered by nui.nvim
 - **📊 Interactive Dashboard**: Beautiful popup overview with sync status and quick actions
 - **🔄 GitHub Sync**: One-command sync with automatic repository creation and backup
-- **🚀 Zero Dependencies**: Works with built-in vim.ui.select (no external fuzzy finder required)
+- **🚀 Minimal Dependencies**: Works with built-in vim.ui.select and with nui.nvim
 
 ## 📦 Installation
 
