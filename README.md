@@ -2,6 +2,8 @@
 
 A comprehensive note-taking plugin for Neovim with full markdown support, beautiful UI components, tagging, pinning, search functionality, GitHub sync, and enhanced syntax highlighting.
 
+Demo 👉🏻 https://x.com/Adib_Hanna/status/1933607974125097369
+
 ## ✨ Features
 
 - **📝 Quick Note Creation**: Create notes with custom names or automatic date-based naming
